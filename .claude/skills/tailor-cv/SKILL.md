@@ -50,7 +50,8 @@ recruiter posts for an undisclosed client, use the recruiter's name.
 ## Source of truth
 
 Read `references/master_profile.md` before writing anything. It is the only allowed source of facts about
-Thiago. The reason this matters: these CVs go to real employers, and an invented skill or metric that gets
+Thiago. The real phone and email live in `references/contact.local.md`, which is gitignored so they stay out
+of the public repo: use them on the CV contact line, and never copy them into a tracked file. The reason this matters: these CVs go to real employers, and an invented skill or metric that gets
 probed in an interview costs him the job. So:
 
 - Never invent experience, years, tools or metrics. If the JD asks for something not in the profile, leave it
