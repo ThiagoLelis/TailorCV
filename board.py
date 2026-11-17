@@ -8,7 +8,10 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import platform
 import re
+import subprocess
+import sys
 import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,7 +25,7 @@ APPLICATION_FILE = "application.md"
 JOB_INFO_FILE = "job_info.md"
 UI_DIR = Path(__file__).parent / "board_ui"
 UI_TYPES = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}
-API_ROUTE = re.compile(r"^/api/applications/([^/]+)(?:/(move|notes))?$")
+API_ROUTE = re.compile(r"^/api/applications/([^/]+)(?:/(move|notes|open-folder))?$")
 FILE_ROUTE = re.compile(r"^/files/([^/]+)/([^/]+)$")
 
 
@@ -132,6 +135,18 @@ class Board:
         _write(folder, front, notes)
         return self.detail(app_id)
 
+    def open_folder(self, app_id: str) -> dict:
+        """Show the Application's folder in the OS file manager, with the CV's PDF selected if any."""
+        folder = self.find(app_id)
+        # The CV is what gets attached, so a cover letter PDF only wins when it is the only PDF.
+        pdfs = sorted((p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".pdf"),
+                      key=lambda p: ("cover letter" in p.name.lower(), p.name))
+        try:
+            reveal(folder, pdfs[0] if pdfs else None)
+        except (OSError, subprocess.CalledProcessError) as err:
+            raise BoardError(HTTPStatus.INTERNAL_SERVER_ERROR, f"could not open the folder: {err}")
+        return {"opened": folder.name}
+
     def file(self, app_id: str, name: str) -> Path:
         _require_segment(name, "file name")
         path = self.find(app_id) / name
@@ -146,6 +161,33 @@ def _read(folder: Path) -> tuple[dict[str, str], str]:
 
 def _write(folder: Path, front: dict[str, str], notes: str) -> None:
     (folder / APPLICATION_FILE).write_text(render_application(front, notes), encoding="utf-8")
+
+
+def _is_wsl() -> bool:
+    return "microsoft" in platform.uname().release.lower()
+
+
+def reveal_command(folder: Path, select: Path | None) -> list[str]:
+    """The command that opens `folder` in the file manager, highlighting `select` where the OS can."""
+    if sys.platform == "darwin":
+        return ["open", "-R", str(select)] if select else ["open", str(folder)]
+    if _is_wsl():
+        def windows(path: Path) -> str:
+            return subprocess.check_output(["wslpath", "-w", str(path.resolve())], text=True).strip()
+        if not select:
+            return ["explorer.exe", windows(folder)]
+        # Explorer only parses /select,"<path>"; WSL would quote the whole argument when the path has
+        # spaces and Explorer would fall back to Documents. PowerShell passes the argument through as is.
+        path = windows(select).replace("'", "''")  # escape for a PowerShell single-quoted string
+        return ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                f"Start-Process explorer.exe -ArgumentList '/select,\"{path}\"'"]
+    return ["xdg-open", str(folder)]
+
+
+def reveal(folder: Path, select: Path | None) -> None:
+    # Fire and forget: explorer.exe exits non-zero even on success, and the window outlives the request.
+    subprocess.Popen(reveal_command(folder, select), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
 
 
 def _require_segment(name: str, what: str) -> None:
@@ -191,9 +233,11 @@ def create_server(root: Path, port: int) -> ThreadingHTTPServer:
 
         def _post(self, path):
             match = API_ROUTE.match(path)
-            if not match or match.group(2) != "move":
+            if not match or match.group(2) not in ("move", "open-folder"):
                 raise BoardError(HTTPStatus.NOT_FOUND, "not found")
             body = self._body()
+            if match.group(2) == "open-folder":
+                return self._json(board.open_folder(unquote(match.group(1))))
             self._json(board.move(unquote(match.group(1)), body.get("stage", ""), body.get("closed_reason")))
 
         def _put(self, path):

@@ -10,13 +10,14 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import board  # noqa: E402
 
 
-class BoardApiTest(unittest.TestCase):
+class BoardServerCase(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -50,6 +51,8 @@ class BoardApiTest(unittest.TestCase):
             raw = err.read()
             return err.code, json.loads(raw) if raw else None
 
+
+class BoardApiTest(BoardServerCase):
     def test_lists_applications_with_stage_newest_first(self):
         self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10")
         self.write_application("applied", "2026-11-16_Globex_Engineer", "2026-11-16",
@@ -120,6 +123,7 @@ class BoardApiTest(unittest.TestCase):
         text = (self.root / "awaiting" / "2026-11-10_Acme_Engineer" / "application.md").read_text()
         self.assertNotIn("closed_reason", text)
 
+
     def test_opening_an_application_returns_notes_job_info_and_files(self):
         folder = self.write_application("applied", "2026-11-10_Acme_Engineer", "2026-11-10",
                                         notes="Talked to Ana.\n")
@@ -187,3 +191,71 @@ class BoardApiTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OpenFolderTest(BoardServerCase):
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch.object(board, "reveal")
+        self.reveal = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_opens_the_folder_with_the_cv_pdf_selected_over_a_cover_letter(self):
+        folder = self.write_application("applied", "2026-11-10_Acme_Engineer", "2026-11-10")
+        (folder / "Jane Doe - Acme.pdf").write_bytes(b"%PDF-1.4")
+        (folder / "Jane Doe - Acme - Cover Letter.pdf").write_bytes(b"%PDF-1.4")
+        (folder / "Jane Doe - Acme.md").write_text("cv")
+
+        status, _ = self.call("POST", "/api/applications/2026-11-10_Acme_Engineer/open-folder", {})
+
+        self.assertEqual(status, 200)
+        self.reveal.assert_called_once_with(folder, folder / "Jane Doe - Acme.pdf")
+
+    def test_opens_just_the_folder_when_there_is_no_pdf(self):
+        folder = self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10")
+
+        self.call("POST", "/api/applications/2026-11-10_Acme_Engineer/open-folder", {})
+
+        self.reveal.assert_called_once_with(folder, None)
+
+    def test_reports_a_missing_file_manager(self):
+        self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10")
+        self.reveal.side_effect = FileNotFoundError("xdg-open")
+
+        status, body = self.call("POST", "/api/applications/2026-11-10_Acme_Engineer/open-folder", {})
+
+        self.assertEqual(status, 500)
+        self.assertIn("xdg-open", body["error"])
+
+    def test_refuses_other_websites_and_unknown_applications(self):
+        self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10")
+
+        status, _ = self.call("POST", "/api/applications/2026-11-10_Acme_Engineer/open-folder", {},
+                              {"Origin": "https://evil.example"})
+        self.assertEqual(status, 403)
+        status, _ = self.call("POST", "/api/applications/..%2F..%2Fetc/open-folder", {})
+        self.assertIn(status, (400, 404))
+        self.reveal.assert_not_called()
+
+
+class RevealCommandTest(unittest.TestCase):
+    folder = Path("/cvs/applied/2026-11-10_Acme_Engineer")
+    pdf = folder / "Jane Doe - Acme.pdf"
+
+    def test_linux_opens_the_folder(self):
+        with mock.patch.object(board.sys, "platform", "linux"), mock.patch.object(board, "_is_wsl", return_value=False):
+            self.assertEqual(board.reveal_command(self.folder, self.pdf), ["xdg-open", str(self.folder)])
+
+    def test_macos_reveals_the_pdf(self):
+        with mock.patch.object(board.sys, "platform", "darwin"):
+            self.assertEqual(board.reveal_command(self.folder, self.pdf), ["open", "-R", str(self.pdf)])
+            self.assertEqual(board.reveal_command(self.folder, None), ["open", str(self.folder)])
+
+    def test_wsl_selects_the_pdf_in_explorer(self):
+        with mock.patch.object(board.sys, "platform", "linux"), mock.patch.object(board, "_is_wsl", return_value=True), \
+                mock.patch.object(board.subprocess, "check_output", return_value="C:\\cv\\Jane O'Doe - Acme.pdf\n"):
+            command = board.reveal_command(self.folder, self.pdf)
+            self.assertEqual(command[0], "powershell.exe")
+            self.assertEqual(command[-1],
+                             "Start-Process explorer.exe -ArgumentList '/select,\"C:\\cv\\Jane O''Doe - Acme.pdf\"'")
+            self.assertEqual(board.reveal_command(self.folder, None), ["explorer.exe", "C:\\cv\\Jane O'Doe - Acme.pdf"])

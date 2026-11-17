@@ -6,7 +6,7 @@ const MESSAGES = {
     preview: "Preview", edit: "Edit", save: "Save", saved: "Saved", unsaved: "Unsaved changes",
     cancel: "Cancel", closeTitle: "Why is this application closing?", empty: "Nothing here",
     count: (n) => `${n} application${n === 1 ? "" : "s"}`, noJobInfo: "No job info file.",
-    jobPosting: "Job posting", apply: "Apply", discard: "Discard unsaved notes?",
+    jobPosting: "Job posting", apply: "Apply", openFolder: "Open folder", discard: "Discard unsaved notes?",
     error: "Something went wrong: ",
     stages: { awaiting: "Awaiting Application", applied: "Applied", "in-process": "In Process", offer: "Offer", closed: "Closed" },
     reasons: { rejected: "Rejected", withdrawn: "Withdrawn", "posting-closed": "Posting closed" },
@@ -16,7 +16,7 @@ const MESSAGES = {
     preview: "Visualizar", edit: "Editar", save: "Salvar", saved: "Salvo", unsaved: "Alterações não salvas",
     cancel: "Cancelar", closeTitle: "Por que esta candidatura está sendo encerrada?", empty: "Nada aqui",
     count: (n) => `${n} candidatura${n === 1 ? "" : "s"}`, noJobInfo: "Sem arquivo de info da vaga.",
-    jobPosting: "Vaga", apply: "Aplicar", discard: "Descartar anotações não salvas?",
+    jobPosting: "Vaga", apply: "Aplicar", openFolder: "Abrir pasta", discard: "Descartar anotações não salvas?",
     error: "Algo deu errado: ",
     stages: { awaiting: "Esperando aplicação", applied: "Aplicado", "in-process": "Em processo", offer: "Oferta", closed: "Encerrado" },
     reasons: { rejected: "Rejeitado", withdrawn: "Desisti", "posting-closed": "Vaga fechada" },
@@ -161,6 +161,10 @@ function fillDetail() {
     app.apply_url ? link(app.apply_url, t.apply + " ↗") : null,
     app.job_url && app.job_url !== app.apply_url ? link(app.job_url, t.jobPosting + " ↗") : null,
     ...app.files.filter((f) => f.toLowerCase().endsWith(".pdf")).map((f) => link(fileUrl(f), "📄 " + f.replace(/\.pdf$/i, ""))),
+    el("button", {
+      type: "button", textContent: "📂 " + t.openFolder,
+      onclick: () => api(applicationUrl(app.id, "open-folder"), { method: "POST", body: {} }).catch(fail),
+    }),
   );
 
   $("#n-text").value = app.notes;
