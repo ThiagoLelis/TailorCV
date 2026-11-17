@@ -1,18 +1,18 @@
 ---
 name: tailor-cv
-description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for Thiago Lelis from job posting links, plus a vaga_info.md with the apply link, company/culture research and interview prep, and an application.md card for the TailorCV board, saved in generated_cvs/awaiting/<date>_<Company>_<Role>/. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", or wants to regenerate existing CVs after a change to his profile.
+description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for Thiago Lelis from job posting links, plus a vaga_info.md with the apply link, company/culture research and interview prep, and an application.md that tracks the Application on the TailorCV board, saved in generated_cvs/awaiting/<date>_<Company>_<Role>/. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", or wants to regenerate existing CVs after a change to his profile.
 ---
 
 # Tailor CV
 
-Turn job links into ready-to-send application packages for **Thiago Lelis dos Santos**. One folder per job:
+Turn job links into ready-to-send application packages for **Thiago Lelis dos Santos**. One folder per Job Posting:
 
 ```
 generated_cvs/awaiting/<YYYY-MM-DD>_<CompanyNoSpaces>_<Role-With-Hyphens>/
 ├── Thiago Lelis - <Company>.md     # CV source
 ├── Thiago Lelis - <Company>.pdf    # CV to send
 ├── vaga_info.md                    # apply link + company research + interview prep (Portuguese)
-└── application.md                  # the board card: frontmatter + Thiago's own notes
+└── application.md                  # the Application: frontmatter + Thiago's own notes
 ```
 
 The date is today's date.

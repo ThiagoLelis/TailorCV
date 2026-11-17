@@ -22,7 +22,7 @@ class BoardApiTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name) / "generated_cvs"
         self.root.mkdir()
-        server = board.create_server(self.root, "127.0.0.1", 0)
+        server = board.create_server(self.root, 0)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
@@ -36,10 +36,10 @@ class BoardApiTest(unittest.TestCase):
         (path / "application.md").write_text("\n".join(lines) + notes, encoding="utf-8")
         return path
 
-    def call(self, method, path, body=None):
+    def call(self, method, path, body=None, headers=None):
         data = None if body is None else json.dumps(body).encode()
         req = urllib.request.Request(self.base + path, data=data, method=method,
-                                     headers={"Content-Type": "application/json"})
+                                     headers={"Content-Type": "application/json", **(headers or {})})
         try:
             with urllib.request.urlopen(req) as resp:
                 raw = resp.read()
@@ -166,6 +166,23 @@ class BoardApiTest(unittest.TestCase):
                      "/api/applications/..%2F..%2Fsecret.txt"]:
             status, _ = self.call("GET", path)
             self.assertIn(status, (400, 404), path)
+
+    def test_writes_from_other_websites_are_refused(self):
+        folder = self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10")
+        move = "/api/applications/2026-11-10_Acme_Engineer/move"
+
+        # A plain cross-site form/fetch can't set application/json without a CORS preflight.
+        status, _ = self.call("POST", move, {"stage": "applied"}, {"Content-Type": "text/plain"})
+        self.assertEqual(status, 415)
+        status, _ = self.call("POST", move, {"stage": "applied"}, {"Origin": "https://evil.example"})
+        self.assertEqual(status, 403)
+        status, _ = self.call("PUT", "/api/applications/2026-11-10_Acme_Engineer/notes", {"notes": "x"},
+                              {"Origin": "https://evil.example"})
+        self.assertEqual(status, 403)
+        self.assertTrue(folder.is_dir())
+
+        status, _ = self.call("POST", move, {"stage": "applied"}, {"Origin": self.base})
+        self.assertEqual(status, 200)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ Sem banco de dados e sem nuvem: os arquivos em `generated_cvs/` são a única fo
 ## Fluxo
 
 1. No Claude Code, rode `/tailor-cv` com o link de uma vaga. A skill gera o **Pacote** (CV `.md`/`.pdf`,
-   `vaga_info.md` com pesquisa e preparação) e o card `application.md` em `generated_cvs/awaiting/`.
+   `vaga_info.md` com pesquisa e preparação) e a **Candidatura** (`application.md`) em `generated_cvs/awaiting/`.
 2. Abra o board e mova a **Candidatura** entre as etapas conforme o processo avança.
 
 ## Board
@@ -19,11 +19,11 @@ python3 board.py --port 9000  # outra porta
 Só Python 3.10+ da biblioteca padrão, sem `pip install`. Escuta apenas em `127.0.0.1`.
 
 - **Etapas** (cada uma é uma pasta): `awaiting/` → `applied/` → `in-process/` → `offer/` → `closed/`.
-  Mover um card move a pasta. Ao encerrar, o board pede o motivo (rejeitado, desisti, vaga fechada).
-- **Card aberto:** links da vaga, PDFs do CV e da carta, `vaga_info.md` renderizado e as suas anotações
+  Mover uma Candidatura move a pasta dela. Ao encerrar, o board pede o motivo (rejeitado, desisti, vaga fechada).
+- **Candidatura aberta:** links da vaga, PDFs do CV e da carta, `vaga_info.md` renderizado e as suas anotações
   (corpo do `application.md`, edição livre em Markdown; `Ctrl+S` salva).
 - A interface fica em português se o navegador estiver em português; caso contrário, em inglês.
-- Depois de rodar a skill, clique em **Atualizar** (ou recarregue a página) para ver o card novo.
+- Depois de rodar a skill, clique em **Atualizar** (ou recarregue a página) para ver a Candidatura nova.
 
 ```text
 generated_cvs/applied/2026-11-16_Superhuman_AI-Engineer-Mail/

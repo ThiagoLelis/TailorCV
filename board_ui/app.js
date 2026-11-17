@@ -34,6 +34,7 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 
+const CLOSED = "closed"; // the only Stage that needs a closed_reason
 let state = { stages: [], closedReasons: [], applications: [] };
 let current = null; // detail of the open Application
 let savedNotes = "";
@@ -50,6 +51,10 @@ async function api(path, options = {}) {
 }
 
 const fail = (err) => alert(t.error + err.message);
+const reasonLabel = (reason) => t.reasons[reason] || reason;
+const applicationUrl = (id, action = "") => `/api/applications/${encodeURIComponent(id)}${action && "/" + action}`;
+// vaga_info.md holds text scraped from job pages: never inject its HTML unsanitized.
+const renderMarkdown = (text) => DOMPurify.sanitize(marked.parse(text || ""));
 const formatDate = (iso) => {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
@@ -66,11 +71,11 @@ async function load() {
 
 function render() {
   const board = $("#board");
-  board.replaceChildren(...state.stages.map(renderColumn));
+  board.replaceChildren(...state.stages.map(renderStage));
   $("#count").textContent = t.count(state.applications.length);
 }
 
-function renderColumn(stage) {
+function renderStage(stage) {
   const apps = state.applications.filter((a) => a.stage === stage);
   const column = el("section", { className: "column" },
     el("h2", {}, el("span", { textContent: t.stages[stage] }), el("span", { textContent: apps.length })),
@@ -93,7 +98,7 @@ function renderCard(app) {
     el("span", { className: "role muted", textContent: app.role || "" }),
     el("span", { className: "meta" },
       el("span", { textContent: formatDate(app.created) }),
-      app.closed_reason ? el("span", { className: "badge", textContent: t.reasons[app.closed_reason] || app.closed_reason }) : null),
+      app.closed_reason ? el("span", { className: "badge", textContent: reasonLabel(app.closed_reason) }) : null),
   );
   card.addEventListener("click", () => openDetail(app.id).catch(fail));
   card.addEventListener("dragstart", (e) => {
@@ -110,7 +115,7 @@ function askClosedReason() {
   const dialog = $("#close-dialog");
   return new Promise((resolve) => {
     $("#reasons").replaceChildren(...state.closedReasons.map((r) =>
-      el("button", { value: r, textContent: t.reasons[r] || r })));
+      el("button", { value: r, textContent: reasonLabel(r) })));
     dialog.addEventListener("close", () => resolve(state.closedReasons.includes(dialog.returnValue) ? dialog.returnValue : null), { once: true });
     dialog.returnValue = "";
     dialog.showModal();
@@ -121,11 +126,11 @@ async function moveTo(id, stage) {
   const app = state.applications.find((a) => a.id === id);
   if (!app || app.stage === stage) return null;
   let closed_reason;
-  if (stage === "closed") {
+  if (stage === CLOSED) {
     closed_reason = await askClosedReason();
     if (!closed_reason) return null;
   }
-  const moved = await api(`/api/applications/${encodeURIComponent(id)}/move`, { method: "POST", body: { stage, closed_reason } });
+  const moved = await api(applicationUrl(id, "move"), { method: "POST", body: { stage, closed_reason } });
   await load();
   return moved;
 }
@@ -133,7 +138,7 @@ async function moveTo(id, stage) {
 /* ---------- detail ---------- */
 
 async function openDetail(id) {
-  current = await api(`/api/applications/${encodeURIComponent(id)}`);
+  current = await api(applicationUrl(id));
   savedNotes = current.notes;
   fillDetail();
   selectTab(current.notes.trim() || !current.job_info ? "notes" : "info");
@@ -147,7 +152,7 @@ function fillDetail() {
   $("#d-company").textContent = app.company || app.id;
   $("#d-role").textContent = app.role || "";
   $("#d-created").textContent = formatDate(app.created);
-  $("#d-reason").textContent = app.closed_reason ? (t.reasons[app.closed_reason] || app.closed_reason) : "";
+  $("#d-reason").textContent = app.closed_reason ? reasonLabel(app.closed_reason) : "";
   $("#d-stage").replaceChildren(...state.stages.map((s) => el("option", { value: s, textContent: t.stages[s], selected: s === app.stage })));
 
   const fileUrl = (name) => `/files/${encodeURIComponent(app.id)}/${encodeURIComponent(name)}`;
@@ -160,7 +165,7 @@ function fillDetail() {
 
   $("#n-text").value = app.notes;
   $("#n-status").textContent = "";
-  $("#tab-info").innerHTML = app.job_info ? marked.parse(app.job_info) : "";
+  $("#tab-info").innerHTML = app.job_info ? renderMarkdown(app.job_info) : "";
   if (!app.job_info) $("#tab-info").append(el("p", { className: "muted", textContent: t.noJobInfo }));
 }
 
@@ -174,13 +179,15 @@ function setPreview(on) {
   $("#n-preview").hidden = !on;
   $("#n-text").hidden = on;
   $("#n-toggle").textContent = on ? t.edit : t.preview;
-  if (on) $("#n-preview").innerHTML = marked.parse($("#n-text").value || "");
+  if (on) $("#n-preview").innerHTML = renderMarkdown($("#n-text").value);
 }
 
 const dirty = () => current && $("#n-text").value !== savedNotes;
+const showDirty = () => { $("#n-status").textContent = dirty() ? t.unsaved : ""; };
+const confirmDiscard = (e) => { if (dirty() && !confirm(t.discard)) e.preventDefault(); };
 
 async function saveNotes() {
-  current = await api(`/api/applications/${encodeURIComponent(current.id)}/notes`, { method: "PUT", body: { notes: $("#n-text").value } });
+  current = await api(applicationUrl(current.id, "notes"), { method: "PUT", body: { notes: $("#n-text").value } });
   savedNotes = current.notes;
   $("#n-status").textContent = t.saved;
 }
@@ -192,7 +199,7 @@ $("#refresh").addEventListener("click", () => load().catch(fail));
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => selectTab(b.dataset.tab)));
 $("#n-toggle").addEventListener("click", () => setPreview($("#n-preview").hidden));
 $("#n-save").addEventListener("click", () => saveNotes().catch(fail));
-$("#n-text").addEventListener("input", () => { $("#n-status").textContent = dirty() ? t.unsaved : ""; });
+$("#n-text").addEventListener("input", showDirty);
 $("#n-text").addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveNotes().catch(fail); }
 });
@@ -205,14 +212,14 @@ $("#d-stage").addEventListener("change", async (e) => {
     current = { ...current, stage: moved.stage, closed_reason: moved.closed_reason };
     fillDetail();
     $("#n-text").value = draft;
-    $("#n-status").textContent = dirty() ? t.unsaved : "";
+    showDirty();
   } catch (err) {
     e.target.value = current.stage;
     fail(err);
   }
 });
-$("#detail").addEventListener("cancel", (e) => { if (dirty() && !confirm(t.discard)) e.preventDefault(); });
-$("#detail form").addEventListener("submit", (e) => { if (dirty() && !confirm(t.discard)) e.preventDefault(); });
+$("#detail").addEventListener("cancel", confirmDiscard);
+$("#detail form").addEventListener("submit", confirmDiscard);
 $("#detail").addEventListener("close", () => {
   current = null;
   history.replaceState(null, "", location.pathname);
