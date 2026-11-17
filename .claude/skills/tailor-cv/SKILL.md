@@ -1,6 +1,6 @@
 ---
 name: tailor-cv
-description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for Thiago Lelis from job posting links, plus a vaga_info.txt with the apply link, company/culture research and interview prep, saved in generated_cvs/<date>_<Company>_<Role>/. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", or wants to regenerate existing CVs after a change to his profile.
+description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for Thiago Lelis from job posting links, plus a vaga_info.md with the apply link, company/culture research and interview prep, and an application.md card for the TailorCV board, saved in generated_cvs/awaiting/<date>_<Company>_<Role>/. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", or wants to regenerate existing CVs after a change to his profile.
 ---
 
 # Tailor CV
@@ -8,13 +8,41 @@ description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for 
 Turn job links into ready-to-send application packages for **Thiago Lelis dos Santos**. One folder per job:
 
 ```
-generated_cvs/<YYYY-MM-DD>_<CompanyNoSpaces>_<Role-With-Hyphens>/
+generated_cvs/awaiting/<YYYY-MM-DD>_<CompanyNoSpaces>_<Role-With-Hyphens>/
 ├── Thiago Lelis - <Company>.md     # CV source
 ├── Thiago Lelis - <Company>.pdf    # CV to send
-└── vaga_info.txt                   # apply link + company research + interview prep (Portuguese)
+├── vaga_info.md                    # apply link + company research + interview prep (Portuguese)
+└── application.md                  # the board card: frontmatter + Thiago's own notes
 ```
 
-The date is today's date. The PDF name is what recruiters see, so it uses the company's real name with spaces
+The date is today's date.
+
+## The board (Stages are folders)
+
+`python3 board.py` serves a Kanban board over `generated_cvs/` (see `GLOSSARY.md` and `docs/adr/`). Each
+Stage is a folder: `awaiting/`, `applied/`, `in-process/`, `offer/`, `closed/`. The board moves Application
+folders between them, so:
+
+- A **new** Application always goes in `generated_cvs/awaiting/`.
+- To regenerate or update an existing one, find its folder in **any** Stage (`generated_cvs/*/<folder>/`) and
+  work in place. Never move it back to `awaiting/` and never create a duplicate for the same Job Posting.
+- Write `application.md` only when creating the Application. Its body is Thiago's notes: never overwrite or
+  edit it afterwards (you may update frontmatter values like `apply_url` if they were wrong). Format:
+
+```markdown
+---
+company: Awesome Motive
+role: AI Engineer
+job_url: https://www.linkedin.com/jobs/view/4488830591/
+apply_url: https://awesomemotive.com/careers/
+created: 2026-11-16
+---
+```
+
+`company` is the real name with spaces (recruiter name for an undisclosed client; "<poster> (LinkedIn post)"
+for an anonymous post). `job_url` is the posting; `apply_url` is the direct apply link, omitted if there is
+none (e.g. DM-only). `created` is today's date (ISO). Quote a value with double quotes if it contains `: ` or
+starts with a special character. The PDF name is what recruiters see, so it uses the company's real name with spaces
 ("Thiago Lelis - Awesome Motive.pdf"). If the hiring company is unknown (e.g. an anonymous LinkedIn post),
 use the role title instead ("Thiago Lelis - Senior Python Django Engineer.pdf"), never "LinkedIn Post". If a
 recruiter posts for an undisclosed client, use the recruiter's name.
@@ -26,7 +54,7 @@ Thiago. The reason this matters: these CVs go to real employers, and an invented
 probed in an interview costs him the job. So:
 
 - Never invent experience, years, tools or metrics. If the JD asks for something not in the profile, leave it
-  out of the CV and list it as a gap in `vaga_info.txt` (section 6 of the profile lists known gaps).
+  out of the CV and list it as a gap in `vaga_info.md` (section 6 of the profile lists known gaps).
 - Keep the impact metrics: 2 s to 70 ms (96% latency reduction) at Glewee; over 1 billion BRL/day at Luizalabs.
 - Castor EDC ended Nov 2026, so no role says "Present" and Castor is described in past tense.
 - Postgres, Redis and Kubernetes go in the skills section only. Kubernetes is "developer usage", never DevOps.
@@ -70,23 +98,27 @@ Tailoring is surgical, not a rewrite of history:
 
 ### 4. Render the PDF
 ```bash
-python3 -I .claude/skills/tailor-cv/scripts/md2pdf.py "generated_cvs/<folder>/Thiago Lelis - <Company>.md"
+python3 -I .claude/skills/tailor-cv/scripts/md2pdf.py "generated_cvs/awaiting/<folder>/Thiago Lelis - <Company>.md"
 ```
 It writes the PDF next to the .md using headless Chrome/Edge (Windows browser via WSL, or Linux Chromium).
 Read one generated PDF to check the layout the first time in a session.
 
-### 5. Write vaga_info.txt (Portuguese, plain text)
-Follow `references/examples/vaga_info_example.txt`. Sections, in this order:
-- Header: VAGA, EMPRESA (or recruiter), LOCAL/timezone, contract model, EXTRAÍDO EM (date)
-- LINKS PARA APLICAR: direct apply URL first, then the original link and contacts; explain unusual apply flows
+### 5. Write vaga_info.md and application.md (Portuguese, Markdown)
+`vaga_info.md` follows `references/examples/vaga_info_example.md`: `# <job title>`, then a bullet list of
+`**Key:** value` facts, then `##` sections with `- ` bullets. The board renders it, so keep it valid Markdown.
+Sections, in this order:
+- Header bullets: Empresa (or recruiter), Local/timezone, contract model, Extraído em (date)
+- Links para aplicar: direct apply URL first, then the original link and contacts; explain unusual apply flows
   (DM the poster, Workable "How to Apply" steps, email). For DM-only jobs, add a short ready-to-send message
   in English.
-- SOBRE A EMPRESA, then O QUE O TIME FAZ / SOBRE A VAGA, RESPONSABILIDADES, REQUISITOS, DESEJÁVEL, STACK
-- CULTURA / VALORES, BENEFÍCIOS, PROCESSO SELETIVO (when known)
-- PONTOS FORTES PARA DESTACAR: concrete stories from the profile mapped to the JD
-- LACUNAS / PREPARAÇÃO: each gap with a concrete way to prepare, without claiming the skill
-- PERGUNTAS PARA FAZER: 3-4 smart questions (always ask salary/contract model and company name if unknown)
+- Sobre a empresa, then O que o time faz / Sobre a vaga, Responsabilidades, Requisitos, Desejável, Stack
+- Cultura / valores, Benefícios, Processo seletivo (when known)
+- Pontos fortes para destacar: concrete stories from the profile mapped to the JD
+- Lacunas / preparação: each gap with a concrete way to prepare, without claiming the skill
+- Perguntas para fazer: 3-4 smart questions (always ask salary/contract model and company name if unknown)
 - Warnings at the top when relevant: posting closed, job not confirmed, low fit.
+
+Then create `application.md` as described in "The board" above (skip it if the Application already exists).
 
 ### 6. Report back (Portuguese)
 Reply with:
@@ -94,9 +126,9 @@ Reply with:
 - Links that failed and why.
 - Anything the user must do before sending (unusual apply flows, unconfirmed postings).
 - The folder path.
-Keep the per-job interview advice inside each vaga_info.txt rather than repeating it in chat.
+Keep the per-job interview advice inside each vaga_info.md rather than repeating it in chat.
 
 ## Updating existing CVs
 If the user asks to change something across CVs (a new skill, a date, a wording rule): update
-`master_profile.md`, edit every affected `Thiago Lelis - *.md` under `generated_cvs/` (grep for the old text
+`master_profile.md`, edit every affected `generated_cvs/*/*/Thiago Lelis - *.md` (any Stage) (grep for the old text
 first so nothing is missed), and re-run `md2pdf.py` on all of them.

@@ -1,49 +1,41 @@
-# Job Hunter & AI Resume Generator
+# TailorCV
 
-Pipeline: **Google Alerts (RSS)** → valida se a vaga está aberta → extrai JSON-LD `JobPosting` (Ashby / Greenhouse / Lever) → salva no SQLite → gera um currículo Markdown sob medida com LLM.
+Gera currículos sob medida para cada vaga e acompanha cada candidatura num board Kanban local.
+Sem banco de dados e sem nuvem: os arquivos em `generated_cvs/` são a única fonte da verdade.
 
-## Setup
+## Fluxo
 
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env          # preencha ANTHROPIC_API_KEY
-# edite base_resume.md com o seu currículo
-# edite feeds.txt com as URLs RSS dos seus Google Alerts
-```
+1. No Claude Code, rode `/tailor-cv` com o link de uma vaga. A skill gera o **Pacote** (CV `.md`/`.pdf`,
+   `vaga_info.md` com pesquisa e preparação) e o card `application.md` em `generated_cvs/awaiting/`.
+2. Abra o board e mova a **Candidatura** entre as etapas conforme o processo avança.
 
-No Google Alerts, em "Mostrar opções" escolha **Enviar para: Feed RSS** e copie a URL do ícone RSS.
-Dica de busca: `site:jobs.ashbyhq.com OR site:job-boards.greenhouse.io OR site:jobs.lever.co "python" "backend"`.
-
-## Uso
+## Board
 
 ```bash
-python main.py                         # processa todos os feeds de feeds.txt
-python main.py --dry-run               # valida/parseia/salva sem chamar a LLM
-python main.py --url https://jobs.lever.co/empresa/uuid   # uma vaga específica
-python main.py --max-age-days 14 -v
-pytest -q                              # testes (todos mockados, sem rede)
+python3 board.py              # http://127.0.0.1:8765
+python3 board.py --port 9000  # outra porta
 ```
 
-Saída: `generated_cvs/{AAAA-MM-DD}_{empresa}_{cargo}.md` e a tabela `jobs` em `jobs.db`
-(status: `pending` → `cv_generated` ou `failed`). Vagas já com `cv_generated` são puladas nas próximas execuções.
+Só Python 3.10+ da biblioteca padrão, sem `pip install`. Escuta apenas em `127.0.0.1`.
 
-## Arquitetura
+- **Etapas** (cada uma é uma pasta): `awaiting/` → `applied/` → `in-process/` → `offer/` → `closed/`.
+  Mover um card move a pasta. Ao encerrar, o board pede o motivo (rejeitado, desisti, vaga fechada).
+- **Card aberto:** links da vaga, PDFs do CV e da carta, `vaga_info.md` renderizado e as suas anotações
+  (corpo do `application.md`, edição livre em Markdown; `Ctrl+S` salva).
+- A interface fica em português se o navegador estiver em português; caso contrário, em inglês.
+- Depois de rodar a skill, clique em **Atualizar** (ou recarregue a página) para ver o card novo.
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `ingestor.py` | Lê feeds, desembrulha `google.com/url?url=...`, deduplica |
-| `validator.py` | `GET` com `allow_redirects=False`; só `200` = aberta. Devolve o HTML para o parser |
-| `parsers.py` | `ATSParser` abstrato (template method: JSON-LD → fallback HTML), 3 estratégias e `get_parser(url)` |
-| `cv_generator.py` | Prompt da spec (regras no system, currículo + vaga no user). Anthropic ou OpenAI via `LLM_PROVIDER` |
-| `storage.py` | SQLite; `id` = hash da URL |
-| `main.py` | Orquestração + CLI |
+```text
+generated_cvs/applied/2026-11-16_Superhuman_AI-Engineer-Mail/
+├── Thiago Lelis - Superhuman.md / .pdf
+├── vaga_info.md        # gerado pela skill (pode ser regenerado)
+└── application.md      # frontmatter (company, role, job_url, apply_url, created, closed_reason) + suas anotações
+```
 
-Para adicionar um ATS (ex.: Workable): crie uma subclasse de `ATSParser` com `platform`, `domains` e `fallback_extract`, e inclua-a em `PARSERS`.
+Vocabulário em [GLOSSARY.md](GLOSSARY.md); decisões em [docs/adr/](docs/adr/).
 
-## Decisões em relação à spec
+## Testes
 
-- **Modelo:** `claude-3-5-sonnet-latest` foi aposentado; o padrão é `claude-sonnet-5-5`, configurável por `LLM_MODEL`.
-- **Validação:** além de 301/302/404, qualquer status ≠ 200 (403, 5xx, erro de rede) também é tratado como indisponível.
-- **Descarte por data:** vagas com mais de 30 dias são descartadas; vagas **sem** `datePosted` são mantidas.
-- **Data no nome do arquivo:** data de geração do CV.
+```bash
+python3 -m unittest discover -s tests   # ou: pytest -q
+```

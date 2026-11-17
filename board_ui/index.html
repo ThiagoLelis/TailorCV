@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TailorCV Board</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>TailorCV</h1>
+    <span id="count" class="muted"></span>
+    <button id="refresh" type="button" data-i18n="refresh"></button>
+  </header>
+
+  <main id="board" class="board" aria-live="polite"></main>
+
+  <dialog id="detail" class="detail">
+    <form method="dialog" class="detail-head">
+      <div>
+        <h2 id="d-company"></h2>
+        <p id="d-role" class="muted"></p>
+      </div>
+      <button value="close" class="icon" aria-label="Close">✕</button>
+    </form>
+    <div class="detail-meta">
+      <label><span data-i18n="stage"></span> <select id="d-stage"></select></label>
+      <span id="d-reason" class="badge"></span>
+      <span id="d-created" class="muted"></span>
+    </div>
+    <div id="d-links" class="links"></div>
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="notes" data-i18n="notes"></button>
+      <button type="button" role="tab" data-tab="info" data-i18n="jobInfo"></button>
+    </nav>
+    <section id="tab-notes" class="tab">
+      <div class="notes-toolbar">
+        <button type="button" id="n-toggle" data-i18n="preview"></button>
+        <span id="n-status" class="muted"></span>
+        <button type="button" id="n-save" class="primary" data-i18n="save"></button>
+      </div>
+      <textarea id="n-text" spellcheck="true"></textarea>
+      <div id="n-preview" class="markdown" hidden></div>
+    </section>
+    <section id="tab-info" class="tab markdown" hidden></section>
+  </dialog>
+
+  <dialog id="close-dialog" class="small">
+    <form method="dialog">
+      <h3 data-i18n="closeTitle"></h3>
+      <div id="reasons" class="reasons"></div>
+      <menu>
+        <button value="cancel" data-i18n="cancel"></button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="/marked.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

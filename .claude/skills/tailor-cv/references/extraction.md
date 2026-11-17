@@ -9,7 +9,7 @@ are JS shells around an ATS that has a public API.
   applications ("Não aceita mais candidaturas" = closed → tell the user, ask before generating).
 - `lnkd.in/p/<code>` short links: resolve with `curl -sIL -m 20 <url> | grep -i '^location'`.
   - To `linkedin.com/posts/...` (a member post): WebFetch works; JD is in the post text; the "how to apply" is often
-    "DM me" — record that in vaga_info.txt.
+    "DM me" — record that in vaga_info.md.
   - To `linkedin.com/feed/update/urn:li:groupPost:...` (group post): requires login, cannot be extracted. Ask the
     user to paste the text.
 
@@ -38,6 +38,6 @@ are JS shells around an ATS that has a public API.
 - Pages listing several roles (e.g. Blue Coding talent page): pick the one that best matches the profile and
   mention the alternatives.
 
-## Company research for vaga_info.txt
+## Company research for vaga_info.md
 Fetch in parallel: the company's careers page (values, benefits, hiring steps), an "about" page, and values/blog
 pages linked from the JD. Only write facts you actually read; mark inferences as such.

@@ -1,28 +1,33 @@
-VAGA: AI Engineer (Superhuman Mail) - Latin America
-EMPRESA: Superhuman (Superhuman Platform Inc.)
-LOCAL: 100% remoto - apenas candidatos na Argentina, Brasil ou México
-CONTRATAÇÃO: via Employer of Record (EOR) local; salário varia por país
-EXTRAÍDO EM: 16/11/2026
+# AI Engineer (Superhuman Mail) - Latin America
 
-LINKS PARA APLICAR
+- **Empresa:** Superhuman (Superhuman Platform Inc.)
+- **Local:** 100% remoto - apenas candidatos na Argentina, Brasil ou México
+- **Contratação:** via Employer of Record (EOR) local; salário varia por país
+- **Extraído em:** 16/11/2026
+
+## Links para aplicar
+
 - Ashby (direto): https://jobs.ashbyhq.com/Superhuman%20Platform%20Inc/b10a5c44-00a5-4887-879f-05c795d5660b
 - Página de carreiras: https://superhuman.com/company/careers/jobs?ashby_jid=b10a5c44-00a5-4887-879f-05c795d5660b
 - Blog de engenharia: http://grammarly.com/blog/engineering
 
-SOBRE A EMPRESA
+## Sobre a empresa
+
 - Plataforma de produtividade com IA. Resultado da fusão de Grammarly (escrita), Coda (workspaces/docs),
   Superhuman Mail (email) e Go (assistente de IA proativo).
 - Fundada em 2009 (origem Grammarly). 40M+ usuários, 50 mil organizações, 3 mil instituições de ensino.
 - Integra com mais de 1 milhão de apps e sites.
 - Mail: posicionado como "a experiência de email mais rápida do mundo".
 
-O QUE O TIME FAZ
+## O que o time faz
+
 - AI Engineers do Mail constroem a plataforma por trás das experiências agênticas: a camada MCP que conecta
   o Superhuman às ferramentas do usuário, e a personalização.
 - Multi-modelo: OpenAI, Anthropic e open source. Um recurso como "Ask AI" roteia entre vários modelos por tarefa.
 - Stack: Go, Postgres, Redis, Kubernetes, AWS, TurboPuffer (banco vetorial/busca).
 
-RESPONSABILIDADES
+## Responsabilidades
+
 - Evoluir o MCP do Superhuman Mail: novas tools, novos padrões
 - Workflows agênticos e personalização em escala
 - Sistemas de evals para medir qualidade e pegar regressões quando prompts/modelos/tools mudam
@@ -30,7 +35,8 @@ RESPONSABILIDADES
 - Dar "AI building blocks" para outros times
 - Ajudar a definir a estratégia de dados/modelagem
 
-REQUISITOS
+## Requisitos
+
 - 4-7+ anos de engenharia, base forte de backend (Python/TypeScript ótimo, Go é diferencial)
 - Features com LLM em produção (agentes, agentic loops)
 - Experiência construindo evals
@@ -38,7 +44,8 @@ REQUISITOS
 - Conhecimento prático de ML para escolher modelos ("builders, not researchers")
 - Conforto com ambiguidade, usa IA para a própria produtividade
 
-CULTURA / VALORES (blog.superhuman.com/our-values)
+## Cultura / valores (blog.superhuman.com/our-values)
+
 1. (Super) Human-Centered - IA para potencializar pessoas; sucesso = valor entregue ao usuário
 2. Win with Grit - metas ousadas, persistência, ownership dos resultados
 3. Craft Remarkable Delight - produtos simples e prazerosos a ponto de as pessoas comentarem
@@ -47,11 +54,13 @@ CULTURA / VALORES (blog.superhuman.com/our-values)
 6. Prioritize the Pond - bem coletivo, agir como dono
 - A vaga pede: "Tell us your superpower!" -> responda isso na candidatura.
 
-BENEFÍCIOS (via EOR)
+## Benefícios (via EOR)
+
 - Plano de saúde e odontológico (família), 20 dias de férias (ou o legal, o que for maior), sabático de 20 dias após 5 anos
 - US$2.000/ano para aprendizado, US$120/trimestre bem-estar, auxílio home office até US$200
 
-PONTOS FORTES PARA DESTACAR
+## Pontos fortes para destacar
+
 - MCP em produção na Castor: integração de agentes com ferramentas e dados corporativos. É o coração da vaga.
 - Evals: validador de chamadas LLM (validação determinística contra o contrato + LLM-as-a-Judge com modelo mais barato).
   Prepare uma história completa: o que media, como detectava erro, custo vs. qualidade do modelo juiz.
@@ -59,12 +68,14 @@ PONTOS FORTES PARA DESTACAR
 - Performance (2s -> 70ms) conversa com "o email mais rápido do mundo".
 - "Superpower" sugerido: integrar agentes de IA com dados reais e bagunçados de forma confiável.
 
-LACUNAS / PREPARAÇÃO
+## Lacunas / preparação
+
 - Go: não está no seu perfil. Diga que é diferencial na vaga e mostre disposição (ex.: estudar Go antes da entrevista).
 - TurboPuffer / busca vetorial: leia sobre o produto; conecte com sua experiência em ElasticSearch.
 - Seleção de modelos: prepare exemplos de trade-off custo/latência/qualidade (o próprio LLM-as-a-Judge com modelo barato é um).
 
-PERGUNTAS PARA FAZER
+## Perguntas para fazer
+
 - Como vocês estruturam evals hoje (offline, online, datasets)?
 - Como a camada MCP do Mail é exposta (servidor público? só agentes internos?)
 - Como o time de Mail colabora com Grammarly/Coda/Go após a fusão?

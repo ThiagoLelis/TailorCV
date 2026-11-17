@@ -1,0 +1,245 @@
+"""TailorCV board: a local server over generated_cvs/, where each Stage is a folder.
+
+Run: python3 board.py [--root generated_cvs] [--port 8765]
+See docs/adr/0001 and 0002.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import mimetypes
+import re
+import urllib.parse
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+STAGES = ["awaiting", "applied", "in-process", "offer", "closed"]
+CLOSED_REASONS = ["rejected", "withdrawn", "posting-closed"]
+APPLICATION_FILE = "application.md"
+JOB_INFO_FILE = "vaga_info.md"
+UI_DIR = Path(__file__).parent / "board_ui"
+UI_TYPES = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}
+API_ROUTE = re.compile(r"^/api/applications/([^/]+)(?:/(move|notes))?$")
+FILE_ROUTE = re.compile(r"^/files/([^/]+)/([^/]+)$")
+
+
+class BoardError(Exception):
+    def __init__(self, status: HTTPStatus, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def parse_application(text: str) -> tuple[dict[str, str], str]:
+    """Split application.md into (frontmatter, notes)."""
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return {}, text
+    front: dict[str, str] = {}
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            notes = "\n".join(lines[i + 1:])
+            return front, notes[1:] if notes.startswith("\n") else notes
+        key, sep, value = line.partition(":")
+        if sep:
+            front[key.strip()] = _unquote(value.strip())
+    return {}, text
+
+
+def render_application(front: dict[str, str], notes: str) -> str:
+    lines = ["---", *(f"{key}: {_quote(value)}" for key, value in front.items()), "---", ""]
+    return "\n".join(lines) + notes
+
+
+_PLAIN = re.compile(r"^[\w./:?=&%+@~#-][\w ./:?=&%+@~#,()'-]*$")
+
+
+def _quote(value: str) -> str:
+    value = str(value)
+    return value if _PLAIN.match(value) and not value.endswith(" ") else json.dumps(value, ensure_ascii=False)
+
+
+def _unquote(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
+    return value
+
+
+class Board:
+    def __init__(self, root: Path):
+        self.root = root
+
+    def applications(self) -> list[dict]:
+        found = []
+        for stage in STAGES:
+            stage_dir = self.root / stage
+            if not stage_dir.is_dir():
+                continue
+            for folder in stage_dir.iterdir():
+                file = folder / APPLICATION_FILE
+                if file.is_file():
+                    front, _ = parse_application(file.read_text(encoding="utf-8"))
+                    found.append({**front, "id": folder.name, "stage": stage})
+        return sorted(found, key=lambda a: (a.get("created", ""), a["id"]), reverse=True)
+
+    def find(self, app_id: str) -> Path:
+        if app_id in ("", ".", "..") or "/" in app_id or "\\" in app_id:
+            raise BoardError(HTTPStatus.BAD_REQUEST, "invalid application id")
+        for stage in STAGES:
+            folder = self.root / stage / app_id
+            if (folder / APPLICATION_FILE).is_file():
+                return folder
+        raise BoardError(HTTPStatus.NOT_FOUND, "application not found")
+
+    def summary(self, folder: Path) -> dict:
+        front, _ = parse_application((folder / APPLICATION_FILE).read_text(encoding="utf-8"))
+        return {**front, "id": folder.name, "stage": folder.parent.name}
+
+    def move(self, app_id: str, stage: str, closed_reason: str | None = None) -> dict:
+        if stage not in STAGES:
+            raise BoardError(HTTPStatus.BAD_REQUEST, f"unknown stage: {stage}")
+        if stage == "closed" and closed_reason not in CLOSED_REASONS:
+            raise BoardError(HTTPStatus.BAD_REQUEST, f"closed_reason must be one of {CLOSED_REASONS}")
+        folder = self.find(app_id)
+        target = self.root / stage / app_id
+        if target != folder:
+            if target.exists():
+                raise BoardError(HTTPStatus.CONFLICT, f"{stage}/{app_id} already exists")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            folder.rename(target)
+
+        file = target / APPLICATION_FILE
+        front, notes = parse_application(file.read_text(encoding="utf-8"))
+        if stage == "closed":
+            front["closed_reason"] = closed_reason
+        else:
+            front.pop("closed_reason", None)
+        file.write_text(render_application(front, notes), encoding="utf-8")
+        return self.summary(target)
+
+    def detail(self, app_id: str) -> dict:
+        folder = self.find(app_id)
+        _, notes = parse_application((folder / APPLICATION_FILE).read_text(encoding="utf-8"))
+        job_info = folder / JOB_INFO_FILE
+        return {
+            **self.summary(folder),
+            "notes": notes,
+            "job_info": job_info.read_text(encoding="utf-8") if job_info.is_file() else None,
+            "files": sorted(p.name for p in folder.iterdir() if p.is_file() and p.name != APPLICATION_FILE),
+        }
+
+    def save_notes(self, app_id: str, notes: str) -> dict:
+        if not isinstance(notes, str):
+            raise BoardError(HTTPStatus.BAD_REQUEST, "notes must be a string")
+        file = self.find(app_id) / APPLICATION_FILE
+        front, _ = parse_application(file.read_text(encoding="utf-8"))
+        file.write_text(render_application(front, notes), encoding="utf-8")
+        return self.detail(app_id)
+
+    def file(self, app_id: str, name: str) -> Path:
+        if name in ("", ".", "..") or "/" in name or "\\" in name:
+            raise BoardError(HTTPStatus.BAD_REQUEST, "invalid file name")
+        path = self.find(app_id) / name
+        if not path.is_file():
+            raise BoardError(HTTPStatus.NOT_FOUND, "file not found")
+        return path
+
+
+def _unquote_path(segment: str) -> str:
+    return urllib.parse.unquote(segment)
+
+
+def create_server(root: Path, host: str, port: int) -> ThreadingHTTPServer:
+    board = Board(Path(root))
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self._dispatch(self._get)
+
+        def do_POST(self):
+            self._dispatch(self._post)
+
+        def do_PUT(self):
+            self._dispatch(self._put)
+
+        def _dispatch(self, route):
+            try:
+                path = urllib.parse.urlsplit(self.path).path
+                route(path)
+            except BoardError as err:
+                self._json({"error": str(err)}, err.status)
+
+        def _get(self, path):
+            if path == "/api/applications":
+                return self._json({"stages": STAGES, "closed_reasons": CLOSED_REASONS,
+                                   "applications": board.applications()})
+            if (match := API_ROUTE.match(path)) and not match.group(2):
+                return self._json(board.detail(_unquote_path(match.group(1))))
+            if match := FILE_ROUTE.match(path):
+                file = board.file(_unquote_path(match.group(1)), _unquote_path(match.group(2)))
+                return self._send(file.read_bytes(), mimetypes.guess_type(file.name)[0] or "application/octet-stream")
+            if path == "/" or (path.count("/") == 1 and Path(path).suffix in UI_TYPES):
+                ui = UI_DIR / ("index.html" if path == "/" else path[1:])
+                if ui.is_file():
+                    return self._send(ui.read_bytes(), UI_TYPES[ui.suffix] + "; charset=utf-8")
+            raise BoardError(HTTPStatus.NOT_FOUND, "not found")
+
+        def _post(self, path):
+            match = API_ROUTE.match(path)
+            if not match or match.group(2) != "move":
+                raise BoardError(HTTPStatus.NOT_FOUND, "not found")
+            body = self._body()
+            self._json(board.move(_unquote_path(match.group(1)), body.get("stage", ""), body.get("closed_reason")))
+
+        def _put(self, path):
+            match = API_ROUTE.match(path)
+            if not match or match.group(2) != "notes":
+                raise BoardError(HTTPStatus.NOT_FOUND, "not found")
+            self._json(board.save_notes(_unquote_path(match.group(1)), self._body().get("notes")))
+
+        def _send(self, body: bytes, content_type: str, status=HTTPStatus.OK):
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _body(self) -> dict:
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                raise BoardError(HTTPStatus.BAD_REQUEST, "invalid JSON")
+            if not isinstance(data, dict):
+                raise BoardError(HTTPStatus.BAD_REQUEST, "expected a JSON object")
+            return data
+
+        def _json(self, payload, status=HTTPStatus.OK):
+            self._send(json.dumps(payload).encode("utf-8"), "application/json; charset=utf-8", status)
+
+        def log_message(self, format, *args):
+            pass
+
+    return ThreadingHTTPServer((host, port), Handler)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="TailorCV application board")
+    parser.add_argument("--root", default=Path(__file__).parent / "generated_cvs", type=Path)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", default=8765, type=int)
+    args = parser.parse_args()
+    server = create_server(args.root, args.host, args.port)
+    print(f"TailorCV board on http://{args.host}:{args.port}  (root: {args.root})")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()

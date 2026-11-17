@@ -1,2 +1,0 @@
-# Uma URL de feed RSS do Google Alerts por linha. Linhas com # são ignoradas.
-https://www.google.com/alerts/feeds/05406843375936820973/3488841093657841254
