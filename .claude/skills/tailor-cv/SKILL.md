@@ -1,6 +1,6 @@
 ---
 name: tailor-cv
-description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for Thiago Lelis from job posting links, plus a vaga_info.md with the apply link, company/culture research and interview prep, and an application.md that tracks the Application on the TailorCV board, saved in generated_cvs/awaiting/<date>_<Company>_<Role>/. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", or wants to regenerate existing CVs after a change to his profile.
+description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for Thiago Lelis from job posting links, plus a job_info.md with the apply link, company/culture research and interview prep, and an application.md that tracks the Application on the TailorCV board, saved in generated_cvs/awaiting/<date>_<Company>_<Role>/. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", or wants to regenerate existing CVs after a change to his profile.
 ---
 
 # Tailor CV
@@ -11,7 +11,7 @@ Turn job links into ready-to-send application packages for **Thiago Lelis dos Sa
 generated_cvs/awaiting/<YYYY-MM-DD>_<CompanyNoSpaces>_<Role-With-Hyphens>/
 ├── Thiago Lelis - <Company>.md     # CV source
 ├── Thiago Lelis - <Company>.pdf    # CV to send
-├── vaga_info.md                    # apply link + company research + interview prep (Portuguese)
+├── job_info.md                    # apply link + company research + interview prep (Portuguese)
 └── application.md                  # the Application: frontmatter + Thiago's own notes
 ```
 
@@ -54,7 +54,7 @@ Thiago. The reason this matters: these CVs go to real employers, and an invented
 probed in an interview costs him the job. So:
 
 - Never invent experience, years, tools or metrics. If the JD asks for something not in the profile, leave it
-  out of the CV and list it as a gap in `vaga_info.md` (section 6 of the profile lists known gaps).
+  out of the CV and list it as a gap in `job_info.md` (section 6 of the profile lists known gaps).
 - Keep the impact metrics: 2 s to 70 ms (96% latency reduction) at Glewee; over 1 billion BRL/day at Luizalabs.
 - Castor EDC ended Nov 2026, so no role says "Present" and Castor is described in past tense.
 - Postgres, Redis and Kubernetes go in the skills section only. Kubernetes is "developer usage", never DevOps.
@@ -103,8 +103,8 @@ python3 -I .claude/skills/tailor-cv/scripts/md2pdf.py "generated_cvs/awaiting/<f
 It writes the PDF next to the .md using headless Chrome/Edge (Windows browser via WSL, or Linux Chromium).
 Read one generated PDF to check the layout the first time in a session.
 
-### 5. Write vaga_info.md and application.md (Portuguese, Markdown)
-`vaga_info.md` follows `references/examples/vaga_info_example.md`: `# <job title>`, then a bullet list of
+### 5. Write job_info.md and application.md (Portuguese, Markdown)
+`job_info.md` follows `references/examples/job_info_example.md`: `# <job title>`, then a bullet list of
 `**Key:** value` facts, then `##` sections with `- ` bullets. The board renders it, so keep it valid Markdown.
 Sections, in this order:
 - Header bullets: Empresa (or recruiter), Local/timezone, contract model, Extraído em (date)
@@ -126,7 +126,7 @@ Reply with:
 - Links that failed and why.
 - Anything the user must do before sending (unusual apply flows, unconfirmed postings).
 - The folder path.
-Keep the per-job interview advice inside each vaga_info.md rather than repeating it in chat.
+Keep the per-job interview advice inside each job_info.md rather than repeating it in chat.
 
 ## Updating existing CVs
 If the user asks to change something across CVs (a new skill, a date, a wording rule): update

@@ -123,7 +123,7 @@ class BoardApiTest(unittest.TestCase):
     def test_opening_an_application_returns_notes_job_info_and_files(self):
         folder = self.write_application("applied", "2026-11-10_Acme_Engineer", "2026-11-10",
                                         notes="Talked to Ana.\n")
-        (folder / "vaga_info.md").write_text("# Acme\n\nResearch.\n")
+        (folder / "job_info.md").write_text("# Acme\n\nResearch.\n")
         (folder / "Thiago Lelis - Acme.pdf").write_bytes(b"%PDF-1.4")
         (folder / "Thiago Lelis - Acme.md").write_text("# CV")
 
@@ -133,7 +133,7 @@ class BoardApiTest(unittest.TestCase):
         self.assertEqual(body["stage"], "applied")
         self.assertEqual(body["notes"], "Talked to Ana.\n")
         self.assertEqual(body["job_info"], "# Acme\n\nResearch.\n")
-        self.assertEqual(body["files"], ["Thiago Lelis - Acme.md", "Thiago Lelis - Acme.pdf", "vaga_info.md"])
+        self.assertEqual(body["files"], ["Thiago Lelis - Acme.md", "Thiago Lelis - Acme.pdf", "job_info.md"])
 
     def test_serves_a_file_of_the_application(self):
         folder = self.write_application("applied", "2026-11-10_Acme_Engineer", "2026-11-10")

@@ -53,7 +53,7 @@ async function api(path, options = {}) {
 const fail = (err) => alert(t.error + err.message);
 const reasonLabel = (reason) => t.reasons[reason] || reason;
 const applicationUrl = (id, action = "") => `/api/applications/${encodeURIComponent(id)}${action && "/" + action}`;
-// vaga_info.md holds text scraped from job pages: never inject its HTML unsanitized.
+// job_info.md holds text scraped from job pages: never inject its HTML unsanitized.
 const renderMarkdown = (text) => DOMPurify.sanitize(marked.parse(text || ""));
 const formatDate = (iso) => {
   if (!iso) return "";
