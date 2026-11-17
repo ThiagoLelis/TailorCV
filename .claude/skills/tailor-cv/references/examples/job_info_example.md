@@ -61,11 +61,11 @@
 
 ## Pontos fortes para destacar
 
-- MCP em produção na Castor: integração de agentes com ferramentas e dados corporativos. É o coração da vaga.
-- Evals: validador de chamadas LLM (validação determinística contra o contrato + LLM-as-a-Judge com modelo mais barato).
+- MCP em produção na Northwind Health: integração de agentes com ferramentas e dados internos. É o coração da vaga.
+- Evals: harness que valida os valores extraídos contra o schema + LLM-as-a-Judge com modelo mais barato.
   Prepare uma história completa: o que media, como detectava erro, custo vs. qualidade do modelo juiz.
-- Redis, Postgres, Kubernetes: estão no stack deles.
-- Performance (2s -> 70ms) conversa com "o email mais rápido do mundo".
+- Postgres e Redis: estão no stack deles.
+- Performance (1,5 s -> 120 ms na Brightcart) conversa com "o email mais rápido do mundo".
 - "Superpower" sugerido: integrar agentes de IA com dados reais e bagunçados de forma confiável.
 
 ## Lacunas / preparação

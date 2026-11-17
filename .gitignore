@@ -5,4 +5,4 @@ __pycache__/
 jobs.db
 generated_cvs/*
 !generated_cvs/.gitkeep
-.claude/skills/tailor-cv/references/contact.local.md
+.claude/skills/tailor-cv/references/master_profile.md

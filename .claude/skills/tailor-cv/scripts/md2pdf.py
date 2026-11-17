@@ -1,6 +1,6 @@
 """Minimal Markdown -> ATS-friendly single-column HTML -> PDF via headless Chrome/Edge.
 
-Usage: python3 -I md2pdf.py "<dir>/Thiago Lelis - Company.md" [more.md ...]
+Usage: python3 -I md2pdf.py "<dir>/<Name> - Company.md" [more.md ...]
 Writes the PDF next to each .md (same base name). Works on WSL (Windows Chrome/Edge) and native Linux.
 Supported Markdown: '# ' name, next line headline, next line contact, '## ' sections, '### ' job titles,
 '*...*' meta lines, '- ' bullets, **bold**, *italic*.

@@ -1,21 +1,37 @@
 ---
 name: tailor-cv
-description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for Thiago Lelis from job posting links, plus a job_info.md with the apply link, company/culture research and interview prep, and an application.md that tracks the Application on the TailorCV board, saved in generated_cvs/awaiting/<date>_<Company>_<Role>/. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", or wants to regenerate existing CVs after a change to his profile.
+description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for the user from job posting links, plus a job_info.md with the apply link, company/culture research and interview prep, and an application.md that tracks the Application on the TailorCV board, saved in generated_cvs/awaiting/<date>_<Company>_<Role>/. On first use it builds the user's master profile with them. Use this whenever the user pastes one or more job links (LinkedIn, lnkd.in, Ashby, Greenhouse, Lever, Loxo, careers pages, even a WhatsApp-style list of links) or a job description and wants a CV/resume/currículo for it, asks to "gerar currículo", "adaptar CV", "abrir os links das vagas", wants to set up or update their profile, or wants to regenerate existing CVs after a change to their profile.
 ---
 
 # Tailor CV
 
-Turn job links into ready-to-send application packages for **Thiago Lelis dos Santos**. One folder per Job Posting:
+Turn job links into ready-to-send application packages for the user. All facts about the candidate come from
+`references/master_profile.md`. In this file, `<Name>` is the short name the profile sets for file names
+(section 1). One folder per Job Posting:
 
 ```
 generated_cvs/awaiting/<YYYY-MM-DD>_<CompanyNoSpaces>_<Role-With-Hyphens>/
-├── Thiago Lelis - <Company>.md     # CV source
-├── Thiago Lelis - <Company>.pdf    # CV to send
-├── job_info.md                    # apply link + company research + interview prep (Portuguese)
-└── application.md                  # the Application: frontmatter + Thiago's own notes
+├── <Name> - <Company>.md     # CV source
+├── <Name> - <Company>.pdf    # CV to send
+├── job_info.md               # apply link + company research + interview prep (Portuguese)
+└── application.md            # the Application: frontmatter + the user's own notes
 ```
 
 The date is today's date.
+
+## 0. The profile (first run)
+
+`references/master_profile.md` holds the user's real data, so it is gitignored and each clone starts without
+one. If it is missing, or still has `<placeholders>`, build it before generating any CV:
+
+1. Copy `references/master_profile.template.md` to `references/master_profile.md`.
+2. Ask the user for their current CV, LinkedIn profile PDF, or any text about their career, and read it.
+3. Fill every section from what they gave you. Ask about anything missing that a CV needs: contact details,
+   dates, the short name for file names, real metrics, and which tools they used where.
+4. Never invent anything to fill a gap: leave the item out or ask. The profile is only as good as its facts.
+5. Show a summary of the profile and ask for corrections before going on to the job links.
+
+Never copy profile data into a tracked file (this skill, the examples, the README, tests).
 
 ## The board (Stages are folders)
 
@@ -26,7 +42,7 @@ folders between them, so:
 - A **new** Application always goes in `generated_cvs/awaiting/`.
 - To regenerate or update an existing one, find its folder in **any** Stage (`generated_cvs/*/<folder>/`) and
   work in place. Never move it back to `awaiting/` and never create a duplicate for the same Job Posting.
-- Write `application.md` only when creating the Application. Its body is Thiago's notes: never overwrite or
+- Write `application.md` only when creating the Application. Its body is the user's notes: never overwrite or
   edit it afterwards (you may update frontmatter values like `apply_url` if they were wrong). Format:
 
 ```markdown
@@ -42,23 +58,21 @@ created: 2026-11-16
 `company` is the real name with spaces (recruiter name for an undisclosed client; "<poster> (LinkedIn post)"
 for an anonymous post). `job_url` is the posting; `apply_url` is the direct apply link, omitted if there is
 none (e.g. DM-only). `created` is today's date (ISO). Quote a value with double quotes if it contains `: ` or
-starts with a special character. The PDF name is what recruiters see, so it uses the company's real name with spaces
-("Thiago Lelis - Awesome Motive.pdf"). If the hiring company is unknown (e.g. an anonymous LinkedIn post),
-use the role title instead ("Thiago Lelis - Senior Python Django Engineer.pdf"), never "LinkedIn Post". If a
+starts with a special character. The PDF name is what recruiters see, so it uses the company's real name with
+spaces ("<Name> - Awesome Motive.pdf"). If the hiring company is unknown (e.g. an anonymous LinkedIn post),
+use the role title instead ("<Name> - Senior Python Django Engineer.pdf"), never "LinkedIn Post". If a
 recruiter posts for an undisclosed client, use the recruiter's name.
 
 ## Source of truth
 
 Read `references/master_profile.md` before writing anything. It is the only allowed source of facts about
-Thiago. The real phone and email live in `references/contact.local.md`, which is gitignored so they stay out
-of the public repo: use them on the CV contact line, and never copy them into a tracked file. The reason this matters: these CVs go to real employers, and an invented skill or metric that gets
-probed in an interview costs him the job. So:
+the candidate, contact details included. The reason this matters: these CVs go to real employers, and an
+invented skill or metric that gets probed in an interview costs them the job. So:
 
 - Never invent experience, years, tools or metrics. If the JD asks for something not in the profile, leave it
-  out of the CV and list it as a gap in `job_info.md` (section 6 of the profile lists known gaps).
-- Keep the impact metrics: 2 s to 70 ms (96% latency reduction) at Glewee; over 1 billion BRL/day at Luizalabs.
-- Castor EDC ended Nov 2026, so no role says "Present" and Castor is described in past tense.
-- Postgres, Redis and Kubernetes go in the skills section only. Kubernetes is "developer usage", never DevOps.
+  out of the CV and list it as a gap in `job_info.md` (the profile's "Known gaps" section lists known ones).
+- Apply every rule in the profile's "Tailoring rules" section (metrics to keep, which experience to lead
+  with, wording limits).
 - When the user corrects or adds a fact during the session, update `references/master_profile.md` right away
   (and the gaps list), so future runs get it, then regenerate the affected CVs.
 
@@ -80,15 +94,14 @@ Careers page (values, benefits, hiring steps), about page, values/engineering bl
 write facts you read, and label inferences.
 
 ### 3. Write the CV (English, Markdown)
-Follow the exact structure of `references/examples/cv_example.md`, because `scripts/md2pdf.py` relies on it:
-`# Name`, then a bold headline line, then a contact line, then `##` sections, `###` jobs with a `*meta*` line,
-`- ` bullets.
+Follow the exact structure of `references/examples/cv_example.md` (a fictional candidate: copy its shape,
+never its content), because `scripts/md2pdf.py` relies on it: `# Name`, then a bold headline line, then a
+contact line, then `##` sections, `###` jobs with a `*meta*` line, `- ` bullets.
 
 Tailoring is surgical, not a rewrite of history:
-- **Headline:** "Senior <role-flavored title> | <3-4 JD keywords>".
-- **Professional Summary (3-4 sentences):** connect the job's main need to the most relevant experience. AI /
-  HealthTech roles → Castor + Areti. High-scale backend / fintech / marketplace → Glewee + Luizalabs.
-  Customer-facing / forward-deployed → Areti (scoping, UAT, go-live). Mirror the JD's own terms.
+- **Headline:** "<Seniority> <role-flavored title> | <3-4 JD keywords>".
+- **Professional Summary (3-4 sentences):** connect the job's main need to the most relevant experience
+  (the profile's tailoring rules say which experience fits which kind of role). Mirror the JD's own terms.
 - **Key Technical Skills:** reorder so the JD's languages, tools and concepts come first in each line, and
   the most relevant line is on top.
 - **Experience:** keep every job and its dates; reorder bullets so the most relevant come first; bold-label
@@ -99,7 +112,7 @@ Tailoring is surgical, not a rewrite of history:
 
 ### 4. Render the PDF
 ```bash
-python3 -I .claude/skills/tailor-cv/scripts/md2pdf.py "generated_cvs/awaiting/<folder>/Thiago Lelis - <Company>.md"
+python3 -I .claude/skills/tailor-cv/scripts/md2pdf.py "generated_cvs/awaiting/<folder>/<Name> - <Company>.md"
 ```
 It writes the PDF next to the .md using headless Chrome/Edge (Windows browser via WSL, or Linux Chromium).
 Read one generated PDF to check the layout the first time in a session.
@@ -131,5 +144,5 @@ Keep the per-job interview advice inside each job_info.md rather than repeating 
 
 ## Updating existing CVs
 If the user asks to change something across CVs (a new skill, a date, a wording rule): update
-`master_profile.md`, edit every affected `generated_cvs/*/*/Thiago Lelis - *.md` (any Stage) (grep for the old text
+`master_profile.md`, edit every affected `generated_cvs/*/*/<Name> - *.md` (any Stage) (grep for the old text
 first so nothing is missed), and re-run `md2pdf.py` on all of them.
