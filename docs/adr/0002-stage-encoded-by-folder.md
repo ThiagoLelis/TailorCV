@@ -1,0 +1,3 @@
+# An Application's Stage is the folder it lives in
+
+Each Stage is a folder under `generated_cvs/` (`awaiting/`, `applied/`, `in-process/`, `offer/`, `closed/`), and moving an Application to another Stage moves its whole folder. We chose this over a `stage` field in frontmatter so the state is visible directly in the file explorer without opening the board, matching how applications were already tracked by hand (`aplicadas/`). The cost: an Application's path changes on every move, so nothing may store absolute paths to it, and the CV skill must search every Stage folder when regenerating a Package.
