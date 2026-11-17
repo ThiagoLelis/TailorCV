@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import urllib.parse
+from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -110,6 +111,11 @@ class Board:
             front["closed_reason"] = closed_reason
         else:
             front.pop("closed_reason", None)
+        if target != folder:
+            # Keep only the last entry per Stage; later Stages' entries would be stale (docs/adr/0003).
+            for later in STAGES[STAGES.index(stage) + 1:]:
+                front.pop(_entered_field(later), None)
+            front[_entered_field(stage)] = now().isoformat(timespec="minutes")
         _write(folder, front, notes)
         if target != folder:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -153,6 +159,16 @@ class Board:
         if not path.is_file():
             raise BoardError(HTTPStatus.NOT_FOUND, "file not found")
         return path
+
+
+def now() -> datetime:
+    """Local wall-clock time; the one seam tests replace."""
+    return datetime.now()
+
+
+def _entered_field(stage: str) -> str:
+    """Frontmatter field recording when an Application last entered `stage` (e.g. `in_process_at`)."""
+    return stage.replace("-", "_") + "_at"
 
 
 def _read(folder: Path) -> tuple[dict[str, str], str]:

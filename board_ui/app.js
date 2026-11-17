@@ -8,6 +8,9 @@ const MESSAGES = {
     count: (n) => `${n} application${n === 1 ? "" : "s"}`, noJobInfo: "No job info file.",
     jobPosting: "Job posting", apply: "Apply", openFolder: "Open folder", discard: "Discard unsaved notes?",
     error: "Something went wrong: ",
+    today: "today", days: (n) => `${n} d`, timeInStage: "Time in Stage",
+    toResponse: "Applied → response", toOffer: "Applied → offer",
+    noResponse: (span) => `no response · closed after ${span}`,
     stages: { awaiting: "Awaiting Application", applied: "Applied", "in-process": "In Process", offer: "Offer", closed: "Closed" },
     reasons: { rejected: "Rejected", withdrawn: "Withdrawn", "posting-closed": "Posting closed" },
   },
@@ -18,6 +21,9 @@ const MESSAGES = {
     count: (n) => `${n} candidatura${n === 1 ? "" : "s"}`, noJobInfo: "Sem arquivo de info da vaga.",
     jobPosting: "Vaga", apply: "Aplicar", openFolder: "Abrir pasta", discard: "Descartar anotações não salvas?",
     error: "Algo deu errado: ",
+    today: "hoje", days: (n) => `${n} d`, timeInStage: "Tempo na etapa",
+    toResponse: "Aplicado → resposta", toOffer: "Aplicado → oferta",
+    noResponse: (span) => `sem resposta · encerrada após ${span}`,
     stages: { awaiting: "Esperando aplicação", applied: "Aplicado", "in-process": "Em processo", offer: "Oferta", closed: "Encerrado" },
     reasons: { rejected: "Rejeitado", withdrawn: "Desisti", "posting-closed": "Vaga fechada" },
   },
@@ -61,6 +67,34 @@ const formatDate = (iso) => {
   return isNaN(d) ? iso : d.toLocaleDateString(lang === "pt" ? "pt-BR" : "en-US", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+/* ---------- Time in Stage (docs/adr/0003) ---------- */
+
+// Frontmatter field holding when an Application last entered each Stage, in Stage order.
+const ENTERED = { awaiting: "created", applied: "applied_at", "in-process": "in_process_at", offer: "offer_at", closed: "closed_at" };
+const DONE = new Set(["offer", CLOSED]); // no running time in these
+const DAY = 24 * 60 * 60 * 1000;
+
+// Local time `YYYY-MM-DDTHH:MM`, or a date alone (hand-filled) read as local midnight.
+const parseStamp = (value) => {
+  if (!value) return null;
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? value + "T00:00" : value);
+  return isNaN(d) ? null : d;
+};
+const entered = (app, stage) => parseStamp(app[ENTERED[stage]]);
+const between = (from, to) => (from && to && to >= from ? to - from : null);
+
+// Time in `stage`: from its entry to the next later Stage entry on record, or to now if it is the current Stage.
+function timeInStage(app, stage) {
+  const start = entered(app, stage);
+  if (!start) return null;
+  if (stage === app.stage) return DONE.has(stage) ? null : between(start, new Date());
+  const stages = Object.keys(ENTERED);
+  const next = stages.slice(stages.indexOf(stage) + 1).map((s) => entered(app, s)).find(Boolean);
+  return between(start, next);
+}
+
+const formatSpan = (ms) => (ms == null ? "—" : ms < DAY ? t.today : t.days(Math.floor(ms / DAY)));
+
 /* ---------- board ---------- */
 
 async function load() {
@@ -98,6 +132,8 @@ function renderCard(app) {
     el("span", { className: "role muted", textContent: app.role || "" }),
     el("span", { className: "meta" },
       el("span", { textContent: formatDate(app.created) }),
+      DONE.has(app.stage) ? null
+        : el("span", { textContent: "⏱ " + formatSpan(timeInStage(app, app.stage)), title: t.timeInStage }),
       app.closed_reason ? el("span", { className: "badge", textContent: reasonLabel(app.closed_reason) }) : null),
   );
   card.addEventListener("click", () => openDetail(app.id).catch(fail));
@@ -167,6 +203,17 @@ function fillDetail() {
     }),
   );
 
+  const applied = entered(app, "applied");
+  const closedUnanswered = app.stage === CLOSED && !app.in_process_at && applied;
+  const item = (label, value) => el("li", {}, el("span", { className: "muted", textContent: label + " " }), value);
+  $("#d-times").replaceChildren(
+    ...state.stages.filter((s) => !DONE.has(s)).map((s) => item(t.stages[s], formatSpan(timeInStage(app, s)))),
+    closedUnanswered
+      ? item(t.toResponse, t.noResponse(formatSpan(between(applied, entered(app, CLOSED)))))
+      : item(t.toResponse, formatSpan(between(applied, entered(app, "in-process")))),
+    item(t.toOffer, formatSpan(between(applied, entered(app, "offer")))),
+  );
+
   $("#n-text").value = app.notes;
   $("#n-status").textContent = "";
   $("#tab-info").innerHTML = app.job_info ? renderMarkdown(app.job_info) : "";
@@ -213,7 +260,8 @@ $("#d-stage").addEventListener("change", async (e) => {
     const moved = await moveTo(current.id, stage);
     if (!moved) { e.target.value = current.stage; return; }
     const draft = $("#n-text").value;
-    current = { ...current, stage: moved.stage, closed_reason: moved.closed_reason };
+    // The move returns the new summary; keep only what it lacks, so cleared timestamps disappear too.
+    current = { ...moved, notes: current.notes, job_info: current.job_info, files: current.files };
     fillDetail();
     $("#n-text").value = draft;
     showDirty();

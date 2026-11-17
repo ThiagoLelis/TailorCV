@@ -9,6 +9,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
@@ -187,6 +188,56 @@ class BoardApiTest(BoardServerCase):
 
         status, _ = self.call("POST", move, {"stage": "applied"}, {"Origin": self.base})
         self.assertEqual(status, 200)
+
+
+class TimeInStageTest(BoardServerCase):
+    """Entering a Stage records when, as `<stage>_at` in the frontmatter (see docs/adr/0003)."""
+
+    APP = "2026-11-10_Acme_Engineer"
+
+    def move_at(self, when, stage, **body):
+        with mock.patch.object(board, "now", return_value=datetime(*when)):
+            status, summary = self.call("POST", f"/api/applications/{self.APP}/move", {"stage": stage, **body})
+        self.assertEqual(status, 200)
+        return summary
+
+    def test_entering_a_stage_records_when(self):
+        self.write_application("awaiting", self.APP, "2026-11-10")
+
+        summary = self.move_at((2026, 11, 17, 14, 30), "applied")
+
+        self.assertEqual(summary["applied_at"], "2026-11-17T14:30")
+        _, body = self.call("GET", "/api/applications")
+        self.assertEqual(body["applications"][0]["applied_at"], "2026-11-17T14:30")
+
+    def test_moving_back_restarts_the_stage_and_forgets_later_ones(self):
+        self.write_application("in-process", self.APP, "2026-11-10", applied_at="2026-11-11T09:00",
+                               in_process_at="2026-11-14T10:00", offer_at="2026-11-15T10:00",
+                               closed_at="2026-11-16T10:00")
+
+        summary = self.move_at((2026, 11, 17, 14, 30), "applied")
+
+        self.assertEqual(summary["applied_at"], "2026-11-17T14:30")
+        for later in ("in_process_at", "offer_at", "closed_at"):
+            self.assertNotIn(later, summary)
+        text = (self.root / "applied" / self.APP / "application.md").read_text()
+        self.assertNotIn("in_process_at", text)
+
+    def test_closing_without_a_response_keeps_when_it_was_applied(self):
+        self.write_application("applied", self.APP, "2026-11-10", applied_at="2026-11-11T09:00")
+
+        summary = self.move_at((2026, 11, 23, 8, 5), "closed", closed_reason="rejected")
+
+        self.assertEqual(summary["applied_at"], "2026-11-11T09:00")
+        self.assertEqual(summary["closed_at"], "2026-11-23T08:05")
+        self.assertNotIn("in_process_at", summary)
+
+    def test_moving_to_the_current_stage_keeps_its_entry(self):
+        self.write_application("applied", self.APP, "2026-11-10", applied_at="2026-11-11T09:00")
+
+        summary = self.move_at((2026, 11, 17, 14, 30), "applied")
+
+        self.assertEqual(summary["applied_at"], "2026-11-11T09:00")
 
 
 if __name__ == "__main__":
