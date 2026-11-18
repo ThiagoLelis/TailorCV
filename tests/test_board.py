@@ -3,6 +3,7 @@
 Run: python3 -m unittest discover -s tests
 """
 import json
+import subprocess
 import sys
 import tempfile
 import threading
@@ -310,3 +311,106 @@ class RevealCommandTest(unittest.TestCase):
             self.assertEqual(command[-1],
                              "Start-Process explorer.exe -ArgumentList '/select,\"C:\\cv\\Jane O''Doe - Acme.pdf\"'")
             self.assertEqual(board.reveal_command(self.folder, None), ["explorer.exe", "C:\\cv\\Jane O'Doe - Acme.pdf"])
+
+
+class PostingKeysTest(unittest.TestCase):
+    def assertKeys(self, url, *keys):
+        self.assertEqual(board.posting_keys(url), set(keys), url)
+
+    def test_ashby_on_its_board_and_embedded_in_a_careers_page(self):
+        uuid = "7085c73e-c2a7-4b2f-9a36-49d780e03c2a"
+        self.assertKeys(f"https://jobs.ashbyhq.com/buffer/{uuid}", f"ashby:{uuid}")
+        self.assertKeys(f"https://jobs.ashbyhq.com/buffer/{uuid}/application", f"ashby:{uuid}")
+        self.assertKeys(f"https://buffer.com/journey/{uuid}?ashby_jid={uuid}", f"ashby:{uuid}")
+        self.assertKeys(f"https://superhuman.com/company/careers/jobs?ashby_jid={uuid.upper()}", f"ashby:{uuid}")
+
+    def test_lever_with_and_without_apply(self):
+        base = "https://jobs.lever.co/bluecoding/456ce1b0-5a77-4a27-9a82-37d0074f14ec"
+        self.assertKeys(base, "lever:456ce1b0-5a77-4a27-9a82-37d0074f14ec")
+        self.assertKeys(base + "/apply", "lever:456ce1b0-5a77-4a27-9a82-37d0074f14ec")
+
+    def test_greenhouse_on_its_boards_and_embedded(self):
+        self.assertKeys("https://boards.greenhouse.io/acme/jobs/4012345", "greenhouse:4012345")
+        self.assertKeys("https://job-boards.greenhouse.io/acme/jobs/4012345?utm_source=x", "greenhouse:4012345")
+        self.assertKeys("https://acme.com/careers/?gh_jid=4012345", "greenhouse:4012345")
+
+    def test_linkedin_job_on_any_subdomain_and_slug(self):
+        self.assertKeys("https://www.linkedin.com/jobs/view/4488830591/", "linkedin-job:4488830591")
+        self.assertKeys("https://br.linkedin.com/jobs/view/ai-engineer-at-awesome-motive-4488830591?trk=abc",
+                        "linkedin-job:4488830591")
+
+    def test_linkedin_post(self):
+        self.assertKeys("https://www.linkedin.com/posts/veraspichka_django-python-htmx-share-7523842219053711362-a8GR/",
+                        "linkedin-post:7523842219053711362")
+        self.assertKeys("https://www.linkedin.com/feed/update/urn:li:activity:7523842219053711362/",
+                        "linkedin-post:7523842219053711362")
+
+    def test_other_links_ignore_tracking_scheme_www_and_trailing_slash(self):
+        self.assertKeys("https://fitnext.app.loxo.co/job/NDI0NzQtbW1nczBrb2hiMnRsbjJiOA==?t=1794576631300",
+                        "url:fitnext.app.loxo.co/job/NDI0NzQtbW1nczBrb2hiMnRsbjJiOA==")
+        self.assertEqual(board.posting_keys("http://www.ruzora.com/jobs/ai-engineer/?utm_campaign=x#apply"),
+                         board.posting_keys("https://ruzora.com/jobs/ai-engineer"))
+        self.assertEqual(board.posting_keys("https://jobs.hireez.com/hatchworks/4909a1af/HREZ-18119/apply"),
+                         board.posting_keys("https://jobs.hireez.com/hatchworks/4909a1af/HREZ-18119"))
+
+    def test_other_query_parameters_identify_the_posting(self):
+        self.assertNotEqual(board.posting_keys("https://acme.com/job?id=1"),
+                            board.posting_keys("https://acme.com/job?id=2"))
+
+    def test_listing_pages_identify_no_posting(self):
+        self.assertKeys("https://www.bluecoding.com/jobs")
+        self.assertKeys("https://talent.bluecoding.com/")
+        self.assertKeys("https://acme.com/careers/")
+
+
+class OpenApplicationTest(BoardServerCase):
+    ASHBY = "https://jobs.ashbyhq.com/acme/7085c73e-c2a7-4b2f-9a36-49d780e03c2a"
+
+    def setUp(self):
+        super().setUp()
+        self.board = board.Board(self.root)
+
+    def test_finds_an_open_application_by_job_or_apply_url(self):
+        self.write_application("applied", "2026-11-10_Acme_Engineer", "2026-11-10",
+                               job_url="https://www.linkedin.com/jobs/view/123/", apply_url=self.ASHBY)
+
+        self.assertEqual(self.board.open_application_for(["https://br.linkedin.com/jobs/view/eng-123"])["id"],
+                         "2026-11-10_Acme_Engineer")
+        # Same posting reached from another source: the LinkedIn job's apply link is the Ashby posting.
+        found = self.board.open_application_for(["https://www.linkedin.com/jobs/view/999/", self.ASHBY + "/application"])
+        self.assertEqual((found["stage"], found["id"]), ("applied", "2026-11-10_Acme_Engineer"))
+        self.assertIsNone(self.board.open_application_for(["https://www.linkedin.com/jobs/view/999/"]))
+
+    def test_every_stage_but_closed_blocks(self):
+        for stage in ("awaiting", "in-process", "offer"):
+            self.write_application(stage, f"2026-11-10_Acme{stage}_Engineer", "2026-11-10", job_url=self.ASHBY)
+            self.assertIsNotNone(self.board.open_application_for([self.ASHBY]), stage)
+            (self.root / stage / f"2026-11-10_Acme{stage}_Engineer" / "application.md").unlink()
+
+        self.write_application("closed", "2026-11-10_Acme_Engineer", "2026-11-10", job_url=self.ASHBY)
+        self.assertIsNone(self.board.open_application_for([self.ASHBY]))
+
+    def test_listing_pages_never_match(self):
+        self.write_application("applied", "2026-11-10_BlueCoding_Engineer", "2026-11-10",
+                               job_url="https://www.bluecoding.com/jobs", apply_url="https://talent.bluecoding.com/")
+
+        self.assertIsNone(self.board.open_application_for(["https://www.bluecoding.com/jobs"]))
+
+    def test_newest_match_wins(self):
+        self.write_application("applied", "2026-11-10_Acme_Engineer", "2026-11-10", job_url=self.ASHBY)
+        self.write_application("awaiting", "2026-11-12_Acme_Engineer", "2026-11-12", job_url=self.ASHBY)
+
+        self.assertEqual(self.board.open_application_for([self.ASHBY])["id"], "2026-11-12_Acme_Engineer")
+
+    def test_cli_exit_codes(self):
+        self.write_application("applied", "2026-11-10_Acme_Engineer", "2026-11-10", job_url=self.ASHBY)
+        script = str(Path(board.__file__))
+
+        found = subprocess.run([sys.executable, script, "--root", str(self.root), "--check", self.ASHBY],
+                               capture_output=True, text=True, timeout=10)
+        self.assertEqual(found.returncode, 1)
+        self.assertEqual(found.stdout.strip(), "applied/2026-11-10_Acme_Engineer  Acme — Engineer")
+
+        missing = subprocess.run([sys.executable, script, "--root", str(self.root), "--check", "https://acme.com/job/2"],
+                                 capture_output=True, text=True, timeout=10)
+        self.assertEqual((missing.returncode, missing.stdout), (0, ""))

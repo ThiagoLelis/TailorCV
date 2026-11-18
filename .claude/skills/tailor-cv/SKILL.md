@@ -7,7 +7,7 @@ description: Generates tailored, ATS-optimized English CVs (Markdown + PDF) for 
 
 Turn job links into ready-to-send application packages for the user. All facts about the candidate come from
 `references/master_profile.md`. In this file, `<Name>` is the short name the profile sets for file names
-(section 1). One folder per Job Posting:
+(section 1). One folder per Application:
 
 ```
 generated_cvs/awaiting/<YYYY-MM-DD>_<CompanyNoSpaces>_<Role-With-Hyphens>/
@@ -17,7 +17,8 @@ generated_cvs/awaiting/<YYYY-MM-DD>_<CompanyNoSpaces>_<Role-With-Hyphens>/
 └── application.md            # the Application: frontmatter + the user's own notes
 ```
 
-The date is today's date.
+The date is today's date. If that folder name already exists in any Stage (a Closed Application being
+pursued again on the same day), append `-2`, `-3`, … so the board can later move it without a name clash.
 
 ## 0. The profile (first run)
 
@@ -46,7 +47,12 @@ folders between them, so:
 
 - A **new** Application always goes in `generated_cvs/awaiting/`.
 - To regenerate or update an existing one, find its folder in **any** Stage (`generated_cvs/*/<folder>/`) and
-  work in place. Never move it back to `awaiting/` and never create a duplicate for the same Job Posting.
+  work in place. Never move it back to `awaiting/`.
+- Never create a **Duplicate Application**: a new one for a Job Posting that already has an Application not
+  in `closed/` (see `GLOSSARY.md`). Check with `python3 board.py --check <url> [<url> ...]`, passing every
+  link you know for the posting. Exit 0 means no open Application. Exit 1 prints the one that blocks it
+  (`<stage>/<folder>  <company> — <role>`). A Closed Application does not block: pursuing the posting again
+  creates a new one. Regenerating an existing Application on request is not creating, so it skips the check.
 - Write `application.md` only when creating the Application. Its body is the user's notes: never overwrite or
   edit it afterwards (you may update frontmatter values like `apply_url` if they were wrong). Format:
 
@@ -61,7 +67,9 @@ created: 2026-11-16
 ```
 
 `company` is the real name with spaces (recruiter name for an undisclosed client; "<poster> (LinkedIn post)"
-for an anonymous post). `job_url` is the posting; `apply_url` is the direct apply link, omitted if there is
+for an anonymous post). `job_url` is the posting itself, never a listing page like `company.com/jobs` (if a
+listing page is the only link you have, keep it, but that posting can no longer be matched as a duplicate);
+`apply_url` is the direct apply link, omitted if there is
 none (e.g. DM-only). `created` is today's date (ISO). Quote a value with double quotes if it contains `: ` or
 starts with a special character. The PDF name is what recruiters see, so it uses the company's real name with
 spaces ("<Name> - Awesome Motive.pdf"). If the hiring company is unknown (e.g. an anonymous LinkedIn post),
@@ -84,6 +92,12 @@ invented skill or metric that gets probed in an interview costs them the job. So
 ## Workflow
 
 ### 1. Extract every job description
+First resolve `lnkd.in` short links and run `python3 board.py --check` on each pasted link. A link that hits an
+open Application gets nothing more: no fetching, no files. Then, after extraction, run `--check` again per
+posting with every link you learned for it (the pasted link, the resolved LinkedIn target, the ATS `jobUrl`,
+the apply URL). That catches the same posting reached through another source, e.g. a LinkedIn job whose apply
+link is an Ashby posting that already has an Application. Stop there for that posting too.
+
 Fetch all links in parallel. Read `references/extraction.md` for how each source behaves (LinkedIn redirects,
 lnkd.in short links, Ashby API behind `?ashby_jid=`, Loxo recruiter pages, ads that point to service pages).
 For each job capture: title, company (or recruiter + "client undisclosed"), location/remote/timezone rules,
@@ -162,6 +176,8 @@ Then create `application.md` as described in "The board" above (skip it if the A
 Reply with:
 - A table: job, fit (1-5 ⭐), main strengths, gaps not included in the CV.
 - Links that failed and why.
+- Links blocked as Duplicate Applications, each with the existing Application's Stage, company, role and folder
+  path, and a note that the user can ask to regenerate it if that is what they meant.
 - Anything the user must do before sending (unusual apply flows, unconfirmed postings).
 - The folder path.
 Keep the per-job interview advice inside each job_info.md rather than repeating it in chat.

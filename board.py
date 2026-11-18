@@ -1,6 +1,8 @@
 """TailorCV board: a local server over generated_cvs/, where each Stage is a folder.
 
 Run: python3 board.py [--root generated_cvs] [--port 8765]
+Check for a Duplicate Application: python3 board.py --check <url> [<url> ...]
+  (exit 1 and print the open Application for that Job Posting; exit 0 and print nothing if there is none)
 See docs/adr/0001 and 0002.
 """
 from __future__ import annotations
@@ -74,6 +76,56 @@ def _unquote(value: str) -> str:
     return value
 
 
+_UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_TRACKING = {"ref", "source", "t", "trk", "refid", "trackingid", "gclid", "fbclid"}
+_LISTING_PAGES = {"jobs", "careers", "career", "join", "join-us", "opportunities", "vagas"}
+
+
+def posting_keys(url: str) -> set[str]:
+    """Keys identifying the Job Posting behind `url`; empty for a link that identifies none (a listing page).
+
+    Two links lead to the same Job Posting only if they share a key (see GLOSSARY.md).
+    """
+    url = url.strip()
+    if "://" not in url:
+        url = "https://" + url
+    parts = urllib.parse.urlsplit(url)
+    host = (parts.hostname or "").removeprefix("www.")  # hostname is already lowercase
+    segments = [s for s in parts.path.split("/") if s]
+    lower = [s.lower() for s in segments]
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    params = {k.lower(): v.lower() for k, v in query}
+
+    if "ashby_jid" in params:
+        return {f"ashby:{params['ashby_jid']}"}
+    if "gh_jid" in params:
+        return {f"greenhouse:{params['gh_jid']}"}
+    if host == "jobs.ashbyhq.com" and len(lower) >= 2 and re.fullmatch(_UUID, lower[1]):
+        return {f"ashby:{lower[1]}"}
+    if host == "jobs.lever.co" and len(lower) >= 2:
+        return {f"lever:{lower[1]}"}
+    if host.endswith("greenhouse.io") and "jobs" in lower[:-1]:
+        return {f"greenhouse:{lower[lower.index('jobs') + 1]}"}
+    if host == "linkedin.com" or host.endswith(".linkedin.com"):
+        path = "/".join(lower)
+        if match := re.match(r"jobs/view/(?:.*-)?(\d+)$", path):
+            return {f"linkedin-job:{match[1]}"}
+        if match := re.match(r"posts/.*?-(\d{15,})-", path) or re.search(r"urn:li:activity:(\d+)", path):
+            return {f"linkedin-post:{match[1]}"}
+
+    if lower and lower[-1] in ("apply", "application"):
+        segments.pop()
+        lower.pop()
+    if not lower or (len(lower) == 1 and lower[0] in _LISTING_PAGES):
+        return set()
+    kept = sorted((k, v) for k, v in query
+                  if k.lower() not in _TRACKING and not k.lower().startswith(("utm_", "hsa_")))
+    normalized = host + "/" + "/".join(segments)
+    if kept:
+        normalized += "?" + urllib.parse.urlencode(kept)
+    return {f"url:{normalized}"}
+
+
 class Board:
     def __init__(self, root: Path):
         self.root = root
@@ -90,6 +142,17 @@ class Board:
             if (folder / APPLICATION_FILE).is_file():
                 return folder
         raise BoardError(HTTPStatus.NOT_FOUND, "application not found")
+
+    def open_application_for(self, urls: list[str]) -> dict | None:
+        """The open (not Closed) Application for the Job Posting behind any of `urls`, newest first."""
+        wanted = set().union(*(posting_keys(url) for url in urls))
+        for app in self.applications():  # newest first
+            if app["stage"] == CLOSED:
+                continue
+            links = (app.get(field, "") for field in ("job_url", "apply_url"))
+            if any(posting_keys(link) & wanted for link in links if link):
+                return app
+        return None
 
     def summary(self, folder: Path) -> dict:
         front, _ = _read(folder)
@@ -299,7 +362,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="TailorCV application board")
     parser.add_argument("--root", default=Path(__file__).parent / "generated_cvs", type=Path)
     parser.add_argument("--port", default=8765, type=int)
+    parser.add_argument("--check", nargs="+", metavar="URL",
+                        help="exit 1 and print the open Application for these Job Posting links, if any")
     args = parser.parse_args()
+    if args.check:
+        app = Board(args.root).open_application_for(args.check)
+        if app:
+            print(f"{app['stage']}/{app['id']}  {app.get('company', '?')} — {app.get('role', '?')}")
+            sys.exit(1)
+        return
     server = create_server(args.root, args.port)
     print(f"TailorCV board on http://{HOST}:{args.port}  (root: {args.root})")
     try:
