@@ -87,7 +87,13 @@ invented skill or metric that gets probed in an interview costs them the job. So
 - Apply every rule in the profile's "Tailoring rules" section (metrics to keep, which experience to lead
   with, wording limits).
 - When the user corrects or adds a fact during the session, update `references/master_profile.md` right away
-  (and the gaps list), so future runs get it, then regenerate the affected CVs.
+  (and the gaps list), so future runs get it.
+  - A **correction** (wrong date, wrong claim, a skill they don't have) makes existing CVs wrong: regenerate every
+    CV that contains it (see "Updating existing CVs").
+  - An **added fact** is new material in the profile, which is a pool each CV picks from by relevance. Put it
+    in the CV you are working on only if it serves that job (it matches the JD's terms, which raises the ATS
+    ranking), and leave earlier CVs alone. Don't offer to add it to them either; the user will ask if they
+    want that.
 
 ## Workflow
 
@@ -116,6 +122,11 @@ write facts you read, and label inferences.
 Follow the exact structure of `references/examples/cv_example.md` (a fictional candidate: copy its shape,
 never its content), because `scripts/md2pdf.py` relies on it: `# Name`, then a bold headline line, then a
 contact line, then `##` sections, `###` jobs with a `*meta*` line, `- ` bullets.
+
+Every CV must rank well in ATS checkers, whatever the job, fit or seniority. The rules below are what those
+checkers reward, so apply all of them every time: none is optional for a "simple" or low-fit job. The only
+choice is which profile facts to use, judged by the JD's own terms (that keyword match is itself what ATS
+ranking scores).
 
 Tailoring is surgical, not a rewrite of history:
 - **Headline:** "<Seniority> <role-flavored title> | <3-4 JD keywords>".
