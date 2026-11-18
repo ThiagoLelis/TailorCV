@@ -26,8 +26,13 @@ one. If it is missing, or still has `<placeholders>`, build it before generating
 
 1. Copy `references/master_profile.template.md` to `references/master_profile.md`.
 2. Ask the user for their current CV, LinkedIn profile PDF, or any text about their career, and read it.
-3. Fill every section from what they gave you. Ask about anything missing that a CV needs: contact details,
-   dates, the short name for file names, real metrics, and which tools they used where.
+3. Fill every section from what they gave you. Ask about anything missing that a CV needs: contact details
+   (LinkedIn included), dates, the short name for file names, and which tools they used where. Dig for the
+   material the writing rules in step 3 of the workflow need, because CVs can't be stronger than the profile:
+   - **Real metrics** for every job: before → after, volume, time or money saved, people or clients served.
+     Ask about each job by name; estimates the user stands behind ("~40%", "10+ clients") are fine.
+   - **Own initiatives:** which projects they proposed themselves, not just built.
+   - **Soft skills and personal traits**, each with the job or project that proves it.
 4. Never invent anything to fill a gap: leave the item out or ask. The profile is only as good as its facts.
 5. Show a summary of the profile and ask for corrections before going on to the job links.
 
@@ -100,13 +105,29 @@ contact line, then `##` sections, `###` jobs with a `*meta*` line, `- ` bullets.
 
 Tailoring is surgical, not a rewrite of history:
 - **Headline:** "<Seniority> <role-flavored title> | <3-4 JD keywords>".
-- **Professional Summary (3-4 sentences):** connect the job's main need to the most relevant experience
+- **Contact line:** location · phone · email · LinkedIn (`linkedin.com/in/...`) as plain text; the renderer
+  makes them clickable. ATS checkers look for all four.
+- **Professional Summary (3-5 sentences):** connect the job's main need to the most relevant experience
   (the profile's tailoring rules say which experience fits which kind of role). Mirror the JD's own terms.
+  Implied first person, no "I"/"my" ("At Acme, built..."): resume convention, and ATS checkers flag pronouns.
+  Close with one sentence of the profile's personal traits, each tied to its evidence ("proactive" next to an
+  initiative they proposed), so the traits read as facts rather than a list of adjectives.
+- **Section names:** keep the standard ones ATS parsers recognize: Professional Summary, Key Technical
+  Skills, Professional Experience, Education, Languages. Don't merge them ("Education & Languages").
 - **Key Technical Skills:** reorder so the JD's languages, tools and concepts come first in each line, and
   the most relevant line is on top.
 - **Experience:** keep every job and its dates; reorder bullets so the most relevant come first; bold-label
   the leading phrase of each bullet; drop or shorten bullets that don't serve this job (older jobs can shrink
   to 1-2 bullets).
+- **Measurable achievements:** at least 5 per CV, each a real number from the profile (before → after,
+  volume, time saved). When the profile has fewer than 5, ask the user for real numbers before writing;
+  ATS checkers and recruiters both count them.
+- **Soft skills:** where a bullet is the evidence for one of the profile's soft skills, use the skill's name as
+  the bullet label (**Stakeholder Communication:**, **Technical Leadership:**, **Cross-Functional
+  Collaboration:**), so ATS checkers find the skill and recruiters see the proof beside it.
+- **Own initiatives:** a project the profile marks as the candidate's own initiative opens with the verbs that
+  show it ("Proposed to the logistics team, architected and built..."). It is the strongest proof of a
+  proactive trait.
 - Strong action verbs (Architected, Engineered, Owned, Eliminated, Spearheaded), direct and results-oriented.
 - Single column, no tables or images, so ATS parsers read it cleanly. Aim for about 1.5-2 pages.
 
@@ -114,8 +135,11 @@ Tailoring is surgical, not a rewrite of history:
 ```bash
 python3 -I .claude/skills/tailor-cv/scripts/md2pdf.py "generated_cvs/awaiting/<folder>/<Name> - <Company>.md"
 ```
-It writes the PDF next to the .md using headless Chrome/Edge (Windows browser via WSL, or Linux Chromium).
-Read one generated PDF to check the layout the first time in a session.
+It writes the PDF next to the .md using headless Chrome/Edge (Windows browser via WSL, or Linux Chromium),
+then reads it back like an ATS does: it fails if any text line was written in pieces (simple parsers read
+those as spaces inside words) or if `pdftotext` can't find the email, phone, LinkedIn or every `##` heading.
+Fix a FAIL before handing the CV over; don't loosen the CSS rules the script documents. Read one generated
+PDF to check the layout the first time in a session.
 
 ### 5. Write job_info.md and application.md (Portuguese, Markdown)
 `job_info.md` follows `references/examples/job_info_example.md`: `# <job title>`, then a bullet list of

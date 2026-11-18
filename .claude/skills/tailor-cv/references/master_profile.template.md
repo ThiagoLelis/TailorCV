@@ -16,7 +16,8 @@ inherits it.
 - **Location:** <City, State, Country> — <remote / on-site / hybrid; time zones you can work>
 - **Phone:** <+00 00 00000-0000>
 - **Email:** <you@example.com>
-- **LinkedIn / GitHub / Portfolio:** <optional links>
+- **LinkedIn:** <linkedin.com/in/you> (goes on every CV's contact line; ATS checkers look for it)
+- **GitHub / Portfolio:** <optional links>
 - **Languages:** <e.g. Portuguese (Native), English (C1)>
 - **Total Experience:** <~N years in ...>
 - **Current status:** <employed at X / available since ...>
@@ -25,6 +26,10 @@ inherits it.
 - **Primary Identity:** <e.g. Senior Backend Engineer>
 - **Core Strengths:** <the 2-3 things you want every recruiter to remember>
 - **Domain Experience:** <industries and how long in each>
+- **Soft skills (each with evidence):** <e.g. Technical Leadership (tech lead for X at Company A);
+  Stakeholder Communication (scoped requirements and led UAT with clients at Company B)>
+- **Personal traits (each with evidence):** <e.g. proactive (proposed and built tool X at Company A);
+  continuous learner (moved from stack Y to Z); hands-on; clear communicator (5 years with US clients)>
 
 ## 3. TECHNICAL SKILLS TAXONOMY
 - **Languages:** <language (years), ...>
@@ -35,13 +40,15 @@ inherits it.
 
 ## 4. WORK EXPERIENCE (MODULAR BLOCKS)
 <!-- One block per job, most recent first. Write more bullets than a CV needs: the skill picks the relevant
-ones per job posting. Put real numbers wherever you have them. -->
+ones per job posting. Put real numbers wherever you have them (before → after, volume, time or money saved):
+each CV needs at least 5 measurable achievements across all jobs. Add "(own initiative)" to the theme of any
+project you proposed yourself, and say so in the bullet. -->
 
 ### <Company> | <Title> (<Remote / City>)
 **Period:** <Mon YYYY – Mon YYYY or Present>
 **Domain:** <industry, product type>
 - **<Theme>:** <what you did, with which tools, and the measurable result>
-- **<Theme>:** <...>
+- **<Theme> (own initiative):** <proposed to <team>, then designed and built <what>, <result with numbers>>
 
 ## 5. EDUCATION
 - **<Degree>** — <Institution> (<year>)

@@ -20,7 +20,9 @@ has none.
 The first time you run `/tailor-cv`, the skill creates it with you from
 [master_profile.template.md](.claude/skills/tailor-cv/references/master_profile.template.md): give it your
 current CV or LinkedIn PDF, answer its questions, and review the result. You can also fill the template by hand.
-The skill never puts anything in a CV that isn't in this file.
+The skill never puts anything in a CV that isn't in this file, so the CVs are only as strong as the profile:
+give it real numbers for each job (before → after, volume, time saved), the projects you proposed yourself,
+and your soft skills and traits with the work that proves them. The skill asks for these when they're missing.
 
 ## Workflow
 
@@ -28,6 +30,10 @@ The skill never puts anything in a CV that isn't in this file.
    plus `job_info.md` with company research and interview prep) and the **Application** (`application.md`)
    in `generated_cvs/awaiting/`.
 2. Open the board and move the **Application** between stages as the hiring process moves forward.
+
+PDFs are rendered with your local Chrome, Edge or Chromium. Install `poppler-utils` (`pdftotext`) too: after
+rendering, the skill reads each PDF back the way an ATS does and fails the CV if the text, contact details or
+section headings don't come through cleanly.
 
 ## Board
 
