@@ -40,6 +40,10 @@ The Stage of an Application that received an offer.
 The final Stage of an Application that ended without proceeding, always with a reason: rejected, withdrawn, or posting closed.
 _Avoid_: Rejected (it is only one of the reasons)
 
+**Fit** (PT: Fit / Aderência):
+How well the candidate matches a Job Posting, from 1 (poor) to 5 (strong), judged when the Application Package is generated and shown as stars on the board.
+_Avoid_: Score, match, rating
+
 **Time in Stage** (PT: Tempo na etapa):
 How long an Application has been, or was, in a Stage, measured from its last entry into that Stage. Offer and Closed are done Stages, so no running time is shown for them.
 _Avoid_: Age, duration (when meaning time in one Stage)

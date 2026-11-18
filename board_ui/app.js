@@ -8,6 +8,7 @@ const MESSAGES = {
     count: (n) => `${n} application${n === 1 ? "" : "s"}`, noJobInfo: "No job info file.",
     jobPosting: "Job posting", apply: "Apply", openFolder: "Open folder", discard: "Discard unsaved notes?",
     error: "Something went wrong: ",
+    fit: (n) => `Fit ${n}/5`,
     today: "today", days: (n) => `${n} d`, timeInStage: "Time in Stage",
     toResponse: "Applied → response", toOffer: "Applied → offer",
     noResponse: (span) => `no response · closed after ${span}`,
@@ -21,6 +22,7 @@ const MESSAGES = {
     count: (n) => `${n} candidatura${n === 1 ? "" : "s"}`, noJobInfo: "Sem arquivo de info da vaga.",
     jobPosting: "Vaga", apply: "Aplicar", openFolder: "Abrir pasta", discard: "Descartar anotações não salvas?",
     error: "Algo deu errado: ",
+    fit: (n) => `Fit ${n}/5`,
     today: "hoje", days: (n) => `${n} d`, timeInStage: "Tempo na etapa",
     toResponse: "Aplicado → resposta", toOffer: "Aplicado → oferta",
     noResponse: (span) => `sem resposta · encerrada após ${span}`,
@@ -66,6 +68,14 @@ const formatDate = (iso) => {
   const d = new Date(iso + "T00:00:00");
   return isNaN(d) ? iso : d.toLocaleDateString(lang === "pt" ? "pt-BR" : "en-US", { day: "2-digit", month: "short", year: "numeric" });
 };
+
+// Fit: how well the candidate matches the Job Posting, 1-5, set by the CV skill. Ignore anything else.
+const fitOf = (app) => (/^[1-5]$/.test(String(app.fit ?? "").trim()) ? Number(app.fit) : null);
+function renderFit(app) {
+  const fit = fitOf(app);
+  if (!fit) return null;
+  return el("span", { className: `fit fit-${fit}`, textContent: "★".repeat(fit) + "☆".repeat(5 - fit), title: t.fit(fit), ariaLabel: t.fit(fit) });
+}
 
 /* ---------- Time in Stage (docs/adr/0003) ---------- */
 
@@ -128,7 +138,7 @@ function renderStage(stage) {
 
 function renderCard(app) {
   const card = el("button", { type: "button", className: "card", draggable: true },
-    el("strong", { textContent: app.company || app.id }),
+    el("span", { className: "card-head" }, el("strong", { textContent: app.company || app.id }), renderFit(app)),
     el("span", { className: "role muted", textContent: app.role || "" }),
     el("span", { className: "meta" },
       el("span", { textContent: formatDate(app.created) }),
@@ -188,6 +198,7 @@ function fillDetail() {
   $("#d-company").textContent = app.company || app.id;
   $("#d-role").textContent = app.role || "";
   $("#d-created").textContent = formatDate(app.created);
+  $("#d-fit").replaceChildren(...[renderFit(app)].filter(Boolean));
   $("#d-reason").textContent = app.closed_reason ? reasonLabel(app.closed_reason) : "";
   $("#d-stage").replaceChildren(...state.stages.map((s) => el("option", { value: s, textContent: t.stages[s], selected: s === app.stage })));
 

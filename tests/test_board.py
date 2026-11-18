@@ -73,6 +73,13 @@ class BoardApiTest(BoardServerCase):
         self.assertEqual(body["applications"][0]["company"], "Globex")
         self.assertEqual(body["applications"][0]["job_url"], "https://jobs.example.com/1")
 
+    def test_lists_and_opens_the_fit(self):
+        self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10", fit="4")
+        _, data = self.call("GET", "/api/applications")
+        self.assertEqual(data["applications"][0]["fit"], "4")
+        _, detail = self.call("GET", "/api/applications/2026-11-10_Acme_Engineer")
+        self.assertEqual(detail["fit"], "4")
+
     def test_moving_to_another_stage_moves_the_folder(self):
         self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10")
 

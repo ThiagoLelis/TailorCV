@@ -63,6 +63,7 @@ role: AI Engineer
 job_url: https://www.linkedin.com/jobs/view/4488830591/
 apply_url: https://awesomemotive.com/careers/
 created: 2026-11-16
+fit: 4
 ---
 ```
 
@@ -70,7 +71,9 @@ created: 2026-11-16
 for an anonymous post). `job_url` is the posting itself, never a listing page like `company.com/jobs` (if a
 listing page is the only link you have, keep it, but that posting can no longer be matched as a duplicate);
 `apply_url` is the direct apply link, omitted if there is
-none (e.g. DM-only). `created` is today's date (ISO). Quote a value with double quotes if it contains `: ` or
+none (e.g. DM-only). `created` is today's date (ISO). `fit` is the same 1-5 fit you report in the chat table (step 6), as a bare
+integer: the board shows it as stars on the card, so the two must match. When regenerating changes your
+assessment, update `fit` too. Quote a value with double quotes if it contains `: ` or
 starts with a special character. The PDF name is what recruiters see, so it uses the company's real name with
 spaces ("<Name> - Awesome Motive.pdf"). If the hiring company is unknown (e.g. an anonymous LinkedIn post),
 use the role title instead ("<Name> - Senior Python Django Engineer.pdf"), never "LinkedIn Post". If a
@@ -185,7 +188,7 @@ Then create `application.md` as described in "The board" above (skip it if the A
 
 ### 6. Report back (Portuguese)
 Reply with:
-- A table: job, fit (1-5 ⭐), main strengths, gaps not included in the CV.
+- A table: job, fit (1-5 ⭐, the `fit` saved in `application.md`), main strengths, gaps not included in the CV.
 - Links that failed and why.
 - Links blocked as Duplicate Applications, each with the existing Application's Stage, company, role and folder
   path, and a note that the user can ask to regenerate it if that is what they meant.
