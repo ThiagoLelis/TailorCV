@@ -54,7 +54,8 @@ folders between them, so:
   (`<stage>/<folder>  <company> — <role>`). A Closed Application does not block: pursuing the posting again
   creates a new one. Regenerating an existing Application on request is not creating, so it skips the check.
 - Write `application.md` only when creating the Application. Its body is the user's notes: never overwrite or
-  edit it afterwards (you may update frontmatter values like `apply_url` if they were wrong). Format:
+  edit it afterwards (you may update frontmatter values like `apply_url` if they were wrong; never write or
+  change `position`, which the board owns). Format:
 
 ```markdown
 ---
@@ -71,7 +72,7 @@ fit: 4
 for an anonymous post). `job_url` is the posting itself, never a listing page like `company.com/jobs` (if a
 listing page is the only link you have, keep it, but that posting can no longer be matched as a duplicate);
 `apply_url` is the direct apply link, omitted if there is
-none (e.g. DM-only). `created` is today's date (ISO). `fit` is the same 1-5 fit you report in the chat table (step 6), as a bare
+none (e.g. DM-only). `created` is today's date (ISO). `fit` is the same 1-5 fit you report in the chat table (step 7), as a bare
 integer: the board shows it as stars on the card, so the two must match. When regenerating changes your
 assessment, update `fit` too. Quote a value with double quotes if it contains `: ` or
 starts with a special character. The PDF name is what recruiters see, so it uses the company's real name with
@@ -186,17 +187,35 @@ Sections, in this order:
 
 Then create `application.md` as described in "The board" above (skip it if the Application already exists).
 
-### 6. Report back (Portuguese)
+### 6. Review each CV
+Run the `review-cv` skill on every CV created or regenerated in this run, in its after-generation mode: it
+reads the PDF as the recruiter screening for that job would, applies the wording fixes and re-renders. Keep
+the questions, gaps and systemic flags it hands back for the report. A gap it finds that `job_info.md`
+doesn't list yet goes into "Lacunas / preparação".
+
+### 7. Report back (Portuguese)
 Reply with:
 - A table: job, fit (1-5 ⭐, the `fit` saved in `application.md`), main strengths, gaps not included in the CV.
 - Links that failed and why.
 - Links blocked as Duplicate Applications, each with the existing Application's Stage, company, role and folder
   path, and a note that the user can ask to regenerate it if that is what they meant.
 - Anything the user must do before sending (unusual apply flows, unconfirmed postings).
+- The review's open red flags per CV: its numbered questions for the user, and any systemic flag with the
+  profile or rule change it proposes.
 - The folder path.
 Keep the per-job interview advice inside each job_info.md rather than repeating it in chat.
 
+## Base CVs (no job posting)
+When the user asks for a generic CV (to save on LinkedIn for Easy Apply, or for low-priority postings), write
+one per positioning they name (e.g. full stack, backend) in `generated_cvs/base/<Name> - <Seniority> <Role>.md`.
+That folder is not a Stage, so it never shows on the board and needs no `job_info.md`, `application.md` or
+duplicate check. Apply every rule of step 3, with the positioning standing in for the JD: its usual keywords
+pick the headline, skill order and bullets, plus any focus the user asks to highlight (e.g. AI, RAG, MCP).
+Render with `md2pdf.py` as in step 4. Report the paths and suggest tailored CVs for the postings they care
+most about.
+
 ## Updating existing CVs
 If the user asks to change something across CVs (a new skill, a date, a wording rule): update
-`master_profile.md`, edit every affected `generated_cvs/*/*/<Name> - *.md` (any Stage) (grep for the old text
-first so nothing is missed), and re-run `md2pdf.py` on all of them.
+`master_profile.md`, edit every affected `generated_cvs/*/*/<Name> - *.md` (any Stage) and
+`generated_cvs/base/<Name> - *.md` (grep for the old text first so nothing is missed), and re-run `md2pdf.py`
+on all of them.

@@ -28,7 +28,8 @@ and your soft skills and traits with the work that proves them. The skill asks f
 
 1. In Claude Code, run `/tailor-cv` with a job posting link. The skill generates the **Package** (CV `.md`/`.pdf`,
    plus `job_info.md` with company research and interview prep) and the **Application** (`application.md`)
-   in `generated_cvs/awaiting/`.
+   in `generated_cvs/awaiting/`. It then runs `/review-cv` on each CV: a recruiter-style review that fixes
+   what it can and asks you for the facts behind the rest. Run `/review-cv` yourself any time for a fresh review.
 2. Open the board and move the **Application** between stages as the hiring process moves forward.
 
 PDFs are rendered with your local Chrome, Edge or Chromium. Install `poppler-utils` (`pdftotext`) too: after
