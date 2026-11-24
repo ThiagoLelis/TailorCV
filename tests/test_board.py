@@ -198,6 +198,133 @@ class BoardApiTest(BoardServerCase):
         self.assertEqual(status, 200)
 
 
+class OrderTest(BoardServerCase):
+    def column(self, stage):
+        _, body = self.call("GET", "/api/applications")
+        return [a["company"] for a in body["applications"] if a["stage"] == stage]
+
+    def move(self, folder, stage, **extra):
+        return self.call("POST", f"/api/applications/{folder}/move", {"stage": stage, **extra})
+
+    def text(self, stage, folder):
+        return (self.root / stage / folder / "application.md").read_text()
+
+    def awaiting(self, *companies):
+        """One Awaiting Application per company, created in this order (so the last one is newest)."""
+        return [self.write_application("awaiting", f"2026-11-1{i}_{c}_Engineer", f"2026-11-1{i}").name
+                for i, c in enumerate(companies)]
+
+    def test_reordering_within_a_column_survives_a_reload(self):
+        acme, globex, initech = self.awaiting("Acme", "Globex", "Initech")
+        self.assertEqual(self.column("awaiting"), ["Initech", "Globex", "Acme"])
+
+        status, _ = self.move(acme, "awaiting", index=0)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.column("awaiting"), ["Acme", "Initech", "Globex"])
+
+        self.move(initech, "awaiting", index=2)
+        self.assertEqual(self.column("awaiting"), ["Acme", "Globex", "Initech"])
+        self.assertIn("position: ", self.text("awaiting", initech))
+
+    def test_dropping_in_another_column_lands_at_the_index(self):
+        acme, globex, initech = self.awaiting("Acme", "Globex", "Initech")
+        self.move(acme, "applied")
+        self.move(globex, "applied", index=1)
+        self.move(initech, "applied", index=1)
+
+        self.assertEqual(self.column("applied"), ["Acme", "Initech", "Globex"])
+        self.assertIn("applied_at", self.text("applied", initech))
+
+    def fits(self, stage, **fits):
+        """One Application per company with that Fit, created in this order (so the last one is newest)."""
+        return [self.write_application(stage, f"2026-11-1{i}_{c}_Engineer", f"2026-11-1{i}", fit=fit).name
+                for i, (c, fit) in enumerate(fits.items())]
+
+    def test_columns_are_ordered_by_fit_then_newest_first(self):
+        self.fits("awaiting", Acme=3, Globex=5, Initech=3, Umbrella="", Hooli=4)
+        self.assertEqual(self.column("awaiting"), ["Globex", "Hooli", "Initech", "Acme", "Umbrella"])
+
+    def test_a_placed_card_stays_put_while_new_ones_slot_in_by_fit(self):
+        acme, globex, initech = self.fits("awaiting", Acme=2, Globex=5, Initech=4)
+        self.move(acme, "awaiting", index=0)
+        self.write_application("awaiting", "2026-11-18_Hooli_Engineer", "2026-11-18", fit=5)
+        self.write_application("awaiting", "2026-11-18_Umbrella_Engineer", "2026-11-18", fit=3)
+
+        self.assertEqual(self.column("awaiting"), ["Acme", "Hooli", "Globex", "Initech", "Umbrella"])
+
+    def test_placing_between_cards_of_the_same_fit_keeps_them_in_their_fit(self):
+        acme, globex, initech = self.fits("awaiting", Acme=5, Globex=5, Initech=2)
+        self.move(initech, "awaiting", index=1)  # between the two Fit 5 cards
+        self.write_application("awaiting", "2026-11-18_Hooli_Engineer", "2026-11-18", fit=4)
+
+        self.assertEqual(self.column("awaiting"), ["Globex", "Initech", "Acme", "Hooli"])
+
+    def test_moving_without_an_index_takes_the_fit_spot_and_forgets_the_placement(self):
+        acme, globex, initech = self.fits("awaiting", Acme=5, Globex=3, Initech=4)
+        self.move(acme, "applied")
+        self.move(globex, "applied", index=0)  # placed above Acme by hand
+        self.move(initech, "awaiting", index=0)
+
+        self.move(initech, "applied")
+
+        self.assertEqual(self.column("applied"), ["Globex", "Acme", "Initech"])
+        self.assertNotIn("position", self.text("applied", initech))
+
+    def test_sorting_a_column_by_fit_forgets_its_placements(self):
+        acme, globex = self.fits("awaiting", Acme=5, Globex=1)
+        (initech,) = self.fits("applied", Initech=1)
+        self.move(globex, "awaiting", index=0)
+        self.move(initech, "applied", index=0)
+
+        status, body = self.call("POST", "/api/stages/awaiting/sort-by-fit", {})
+
+        self.assertEqual(status, 200)
+        self.assertEqual([a["company"] for a in body["applications"] if a["stage"] == "awaiting"], ["Acme", "Globex"])
+        self.assertNotIn("position", self.text("awaiting", globex))
+        self.assertIn("position", self.text("applied", initech))  # other columns keep theirs
+        self.assertEqual(self.call("POST", "/api/stages/nope/sort-by-fit", {})[0], 400)
+
+    def test_placing_below_unplaced_applications_only_writes_the_moved_one(self):
+        acme, globex, initech = self.awaiting("Acme", "Globex", "Initech")
+
+        self.move(initech, "awaiting", index=2)
+
+        self.assertEqual(self.column("awaiting"), ["Globex", "Acme", "Initech"])
+        self.assertNotIn("position", self.text("awaiting", acme))
+        self.assertNotIn("position", self.text("awaiting", globex))
+
+    def test_many_moves_between_the_same_neighbours_keep_the_order(self):
+        acme, globex, initech = self.awaiting("Acme", "Globex", "Initech")
+        self.move(acme, "awaiting", index=0)
+        self.move(globex, "awaiting", index=1)
+        self.move(initech, "awaiting", index=2)
+        for _ in range(60):  # halving the gap each time eventually runs out of float precision
+            self.move(initech, "awaiting", index=1)
+            self.move(globex, "awaiting", index=1)
+        self.assertEqual(self.column("awaiting"), ["Acme", "Globex", "Initech"])
+
+    def test_reordering_inside_closed_keeps_the_reason(self):
+        self.write_application("closed", "2026-11-10_Acme_Engineer", "2026-11-10", closed_reason="rejected")
+        self.write_application("closed", "2026-11-11_Globex_Engineer", "2026-11-11", closed_reason="withdrawn")
+
+        status, _ = self.move("2026-11-11_Globex_Engineer", "closed", index=1)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(self.column("closed"), ["Acme", "Globex"])
+        self.assertIn("closed_reason: withdrawn", self.text("closed", "2026-11-11_Globex_Engineer"))
+
+    def test_rejects_a_bad_index(self):
+        (acme,) = self.awaiting("Acme")
+        for index in (-1, "0", 1.5, True):
+            status, _ = self.move(acme, "awaiting", index=index)
+            self.assertEqual(status, 400, index)
+
+    def test_an_unreadable_position_counts_as_unplaced(self):
+        self.write_application("awaiting", "2026-11-10_Acme_Engineer", "2026-11-10", fit=5, position="99")
+        self.write_application("awaiting", "2026-11-09_Globex_Engineer", "2026-11-09", fit=5, position="oops")
+        self.assertEqual(self.column("awaiting"), ["Globex", "Acme"])
+
+
 class TimeInStageTest(BoardServerCase):
     """Entering a Stage records when, as `<stage>_at` in the frontmatter (see docs/adr/0003)."""
 

@@ -47,6 +47,9 @@ Python 3.10+ standard library only, no `pip install` needed. Listens only on `12
 
 - **Stages** (each one is a folder): `awaiting/` → `applied/` → `in-process/` → `offer/` → `closed/`.
   Moving an Application moves its folder. When closing one, the board asks for the reason (rejected, withdrew, position closed).
+- **Board Order:** each column is sorted by Fit (5 stars first). Drag a card up or down, or drop it at a specific
+  spot in another column, and it stays there (saved as `position` in its `application.md`); new Applications still
+  slot in by Fit around it. **Sort by Fit** on a column forgets the order you set by hand.
 - **Opened Application:** job links, CV and cover letter PDFs, rendered `job_info.md` and your notes
   (the body of `application.md`, freely editable in Markdown; `Ctrl+S` saves).
 - The UI is shown in Portuguese if your browser is set to Portuguese; otherwise, in English.

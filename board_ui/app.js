@@ -8,9 +8,10 @@ const MESSAGES = {
     count: (n) => `${n} application${n === 1 ? "" : "s"}`, noJobInfo: "No job info file.",
     jobPosting: "Job posting", apply: "Apply", openFolder: "Open folder", discard: "Discard unsaved notes?",
     error: "Something went wrong: ",
-    fit: (n) => `Fit ${n}/5`,
-    today: "today", days: (n) => `${n} d`, timeInStage: "Time in Stage",
-    toResponse: "Applied → response", toOffer: "Applied → offer",
+    fit: (n) => `Fit ${n}/5`, sortByFit: "Sort by Fit", sortByFitTitle: "Forget the order you set by hand and sort this column by Fit",
+    lessThanDay: "< 1 d", days: (n) => `${n} d`, timeInStage: "Time in this column",
+    timePerColumn: "Time spent in each column", sinceApplied: "Time since applying", created: (d) => `Created ${d}`,
+    toResponse: "Until a response", toOffer: "Until an offer",
     noResponse: (span) => `no response · closed after ${span}`,
     stages: { awaiting: "Awaiting Application", applied: "Applied", "in-process": "In Process", offer: "Offer", closed: "Closed" },
     reasons: { rejected: "Rejected", withdrawn: "Withdrawn", "posting-closed": "Posting closed" },
@@ -22,9 +23,10 @@ const MESSAGES = {
     count: (n) => `${n} candidatura${n === 1 ? "" : "s"}`, noJobInfo: "Sem arquivo de info da vaga.",
     jobPosting: "Vaga", apply: "Aplicar", openFolder: "Abrir pasta", discard: "Descartar anotações não salvas?",
     error: "Algo deu errado: ",
-    fit: (n) => `Fit ${n}/5`,
-    today: "hoje", days: (n) => `${n} d`, timeInStage: "Tempo na etapa",
-    toResponse: "Aplicado → resposta", toOffer: "Aplicado → oferta",
+    fit: (n) => `Fit ${n}/5`, sortByFit: "Ordenar por Fit", sortByFitTitle: "Esquecer a ordem manual e ordenar esta coluna por Fit",
+    lessThanDay: "< 1 d", days: (n) => `${n} d`, timeInStage: "Tempo nesta coluna",
+    timePerColumn: "Tempo em cada coluna", sinceApplied: "Tempo desde a aplicação", created: (d) => `Criado em ${d}`,
+    toResponse: "Até a resposta", toOffer: "Até a oferta",
     noResponse: (span) => `sem resposta · encerrada após ${span}`,
     stages: { awaiting: "Esperando aplicação", applied: "Aplicado", "in-process": "Em processo", offer: "Oferta", closed: "Encerrado" },
     reasons: { rejected: "Rejeitado", withdrawn: "Desisti", "posting-closed": "Vaga fechada" },
@@ -103,7 +105,7 @@ function timeInStage(app, stage) {
   return between(start, next);
 }
 
-const formatSpan = (ms) => (ms == null ? "—" : ms < DAY ? t.today : t.days(Math.floor(ms / DAY)));
+const formatSpan = (ms) => (ms == null ? "—" : ms < DAY ? t.lessThanDay : t.days(Math.floor(ms / DAY)));
 
 /* ---------- board ---------- */
 
@@ -121,19 +123,53 @@ function render() {
 
 function renderStage(stage) {
   const apps = state.applications.filter((a) => a.stage === stage);
+  // Only offered when someone in the column was placed by hand; otherwise it is already sorted by Fit.
+  const sort = apps.some((a) => a.position != null)
+    ? el("button", { type: "button", className: "sort", textContent: t.sortByFit, title: t.sortByFitTitle })
+    : null;
+  sort?.addEventListener("click", () => sortByFit(stage).catch(fail));
   const column = el("section", { className: "column" },
-    el("h2", {}, el("span", { textContent: t.stages[stage] }), el("span", { textContent: apps.length })),
+    el("h2", {}, el("span", { textContent: t.stages[stage] }),
+      el("span", { className: "column-meta" }, ...[sort].filter(Boolean), el("span", { textContent: apps.length }))),
     ...(apps.length ? apps.map(renderCard) : [el("p", { className: "empty", textContent: t.empty })]),
   );
-  column.addEventListener("dragover", (e) => { e.preventDefault(); column.classList.add("drop"); });
-  column.addEventListener("dragleave", (e) => { if (!column.contains(e.relatedTarget)) column.classList.remove("drop"); });
+  column.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    column.classList.add("drop");
+    showMarker(column, dropIndex(column, e.clientY));
+  });
+  column.addEventListener("dragleave", (e) => { if (!column.contains(e.relatedTarget)) clearDrop(column); });
   column.addEventListener("drop", (e) => {
     e.preventDefault();
-    column.classList.remove("drop");
+    const index = dropIndex(column, e.clientY);
+    clearDrop(column);
     const id = e.dataTransfer.getData("text/plain");
-    if (id) moveTo(id, stage).catch(fail);
+    if (id) moveTo(id, stage, index).catch(fail);
   });
   return column;
+}
+
+/* ---------- placing within a column ---------- */
+
+// The cards a drop is placed among: the dragged card is left out, matching how the server counts.
+const dropTargets = (column) => [...column.querySelectorAll(".card:not(.dragging)")];
+
+function dropIndex(column, y) {
+  const cards = dropTargets(column);
+  const below = cards.findIndex((c) => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
+  return below === -1 ? cards.length : below;
+}
+
+function showMarker(column, index) {
+  const marker = column.querySelector(".drop-marker") || el("div", { className: "drop-marker" });
+  const cards = dropTargets(column);
+  const anchor = cards[index] || null;
+  if (anchor) anchor.before(marker); else column.append(marker);
+}
+
+function clearDrop(column) {
+  column.classList.remove("drop");
+  column.querySelector(".drop-marker")?.remove();
 }
 
 function renderCard(app) {
@@ -168,15 +204,29 @@ function askClosedReason() {
   });
 }
 
-async function moveTo(id, stage) {
+async function sortByFit(stage) {
+  const data = await api(`/api/stages/${encodeURIComponent(stage)}/sort-by-fit`, { method: "POST", body: {} });
+  state.applications = data.applications;
+  render();
+}
+
+// Put Application `id` at `index` of `stage`'s column (0 = top), counted without the card itself, where it stays.
+// Without an index it takes its Fit's spot in the column.
+async function moveTo(id, stage, index = null) {
   const app = state.applications.find((a) => a.id === id);
-  if (!app || app.stage === stage) return null;
+  if (!app) return null;
+  if (app.stage === stage) {
+    if (index == null) return null;
+    const others = state.applications.filter((a) => a.stage === stage && a.id !== id);
+    const at = state.applications.filter((a) => a.stage === stage).indexOf(app);
+    if (Math.min(index, others.length) === at) return null; // dropped where it already was
+  }
   let closed_reason;
-  if (stage === CLOSED) {
+  if (stage === CLOSED && app.stage !== CLOSED) {
     closed_reason = await askClosedReason();
     if (!closed_reason) return null;
   }
-  const moved = await api(applicationUrl(id, "move"), { method: "POST", body: { stage, closed_reason } });
+  const moved = await api(applicationUrl(id, "move"), { method: "POST", body: { stage, closed_reason, index } });
   await load();
   return moved;
 }
@@ -197,7 +247,7 @@ function fillDetail() {
   const app = current;
   $("#d-company").textContent = app.company || app.id;
   $("#d-role").textContent = app.role || "";
-  $("#d-created").textContent = formatDate(app.created);
+  $("#d-created").textContent = app.created ? t.created(formatDate(app.created)) : "";
   $("#d-fit").replaceChildren(...[renderFit(app)].filter(Boolean));
   $("#d-reason").textContent = app.closed_reason ? reasonLabel(app.closed_reason) : "";
   $("#d-stage").replaceChildren(...state.stages.map((s) => el("option", { value: s, textContent: t.stages[s], selected: s === app.stage })));
@@ -217,12 +267,15 @@ function fillDetail() {
   const applied = entered(app, "applied");
   const closedUnanswered = app.stage === CLOSED && !app.in_process_at && applied;
   const item = (label, value) => el("li", {}, el("span", { className: "muted", textContent: label + " " }), value);
+  const group = (title, ...items) => el("div", {}, el("h3", { textContent: title }), el("ul", {}, ...items));
   $("#d-times").replaceChildren(
-    ...state.stages.filter((s) => !DONE.has(s)).map((s) => item(t.stages[s], formatSpan(timeInStage(app, s)))),
-    closedUnanswered
-      ? item(t.toResponse, t.noResponse(formatSpan(between(applied, entered(app, CLOSED)))))
-      : item(t.toResponse, formatSpan(between(applied, entered(app, "in-process")))),
-    item(t.toOffer, formatSpan(between(applied, entered(app, "offer")))),
+    group(t.timePerColumn,
+      ...state.stages.filter((s) => !DONE.has(s)).map((s) => item(t.stages[s], formatSpan(timeInStage(app, s))))),
+    group(t.sinceApplied,
+      closedUnanswered
+        ? item(t.toResponse, t.noResponse(formatSpan(between(applied, entered(app, CLOSED)))))
+        : item(t.toResponse, formatSpan(between(applied, entered(app, "in-process")))),
+      item(t.toOffer, formatSpan(between(applied, entered(app, "offer"))))),
   );
 
   $("#n-text").value = app.notes;

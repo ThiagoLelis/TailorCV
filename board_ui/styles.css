@@ -84,9 +84,16 @@ select { background: var(--surface); border: 1px solid var(--border); border-rad
   transition: background .1s;
 }
 .column.drop { background: var(--drop); }
+.column-meta { display: flex; align-items: center; gap: 8px; }
+.sort {
+  border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--muted);
+  font: inherit; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; cursor: pointer;
+}
+.sort:hover { color: inherit; }
 .column h2 {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -106,6 +113,7 @@ select { background: var(--surface); border: 1px solid var(--border); border-rad
   cursor: grab;
 }
 .card.dragging { opacity: .4; }
+.drop-marker { height: 3px; margin: -5px 2px 2px; border-radius: 2px; background: var(--accent, #3b6fd8); pointer-events: none; }
 .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
 .fit { font-size: 12px; letter-spacing: 1px; white-space: nowrap; color: var(--fit-mid); }
 .fit-4, .fit-5 { color: var(--fit-high); }
@@ -136,7 +144,9 @@ dialog::backdrop { background: rgba(0, 0, 0, .4); }
 .detail-head h2 { margin: 0; font-size: 19px; }
 .detail-head p { margin: 2px 0 0; }
 .detail-meta, .links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px 0; }
-.times { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 10px 16px 0; list-style: none; font-size: 13px; }
+.times { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 10px 16px 0; font-size: 13px; }
+.times h3 { margin: 0 0 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.times ul { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; }
 .links a, .links button {
   border: 1px solid var(--border);
   border-radius: 6px;

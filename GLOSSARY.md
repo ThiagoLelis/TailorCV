@@ -47,3 +47,7 @@ _Avoid_: Score, match, rating
 **Time in Stage** (PT: Tempo na etapa):
 How long an Application has been, or was, in a Stage, measured from its last entry into that Stage. Offer and Closed are done Stages, so no running time is shown for them.
 _Avoid_: Age, duration (when meaning time in one Stage)
+
+**Board Order** (PT: Ordem no board):
+The order of the Applications within one Stage's column: by Fit (highest first, newest first within a Fit), except for Applications the user placed by hand on the board, which stay where they were put across reloads.
+_Avoid_: Priority, rank (the order carries no meaning beyond the user's own arrangement)

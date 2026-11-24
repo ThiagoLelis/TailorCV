@@ -3,7 +3,7 @@
 Run: python3 board.py [--root generated_cvs] [--port 8765]
 Check for a Duplicate Application: python3 board.py --check <url> [<url> ...]
   (exit 1 and print the open Application for that Job Posting; exit 0 and print nothing if there is none)
-See docs/adr/0001 and 0002.
+See docs/adr/0001, 0002 and 0004.
 """
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ JOB_INFO_FILE = "job_info.md"
 UI_DIR = Path(__file__).parent / "board_ui"
 UI_TYPES = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}
 API_ROUTE = re.compile(r"^/api/applications/([^/]+)(?:/(move|notes|open-folder))?$")
+SORT_ROUTE = re.compile(r"^/api/stages/([^/]+)/sort-by-fit$")
 FILE_ROUTE = re.compile(r"^/files/([^/]+)/([^/]+)$")
 
 
@@ -133,7 +134,7 @@ class Board:
     def applications(self) -> list[dict]:
         found = [self.summary(file.parent)
                  for stage in STAGES for file in (self.root / stage).glob(f"*/{APPLICATION_FILE}")]
-        return sorted(found, key=lambda a: (a.get("created", ""), a["id"]), reverse=True)
+        return _board_order(found)
 
     def find(self, app_id: str) -> Path:
         _require_segment(app_id, "application id")
@@ -146,7 +147,7 @@ class Board:
     def open_application_for(self, urls: list[str]) -> dict | None:
         """The open (not Closed) Application for the Job Posting behind any of `urls`, newest first."""
         wanted = set().union(*(posting_keys(url) for url in urls))
-        for app in self.applications():  # newest first
+        for app in _newest_first(self.applications()):
             if app["stage"] == CLOSED:
                 continue
             links = (app.get(field, "") for field in ("job_url", "apply_url"))
@@ -158,20 +159,34 @@ class Board:
         front, _ = _read(folder)
         return {**front, "id": folder.name, "stage": folder.parent.name}
 
-    def move(self, app_id: str, stage: str, closed_reason: str | None = None) -> dict:
+    def move(self, app_id: str, stage: str, closed_reason: str | None = None, index: int | None = None) -> dict:
+        """Move the Application to `stage`, moving its folder if needed.
+
+        With an `index` the user placed it there (0 is the top) and it stays put; without one it goes
+        back to its Fit's spot in the column (docs/adr/0004).
+        """
         if stage not in STAGES:
             raise BoardError(HTTPStatus.BAD_REQUEST, f"unknown stage: {stage}")
-        if stage == CLOSED and closed_reason not in CLOSED_REASONS:
-            raise BoardError(HTTPStatus.BAD_REQUEST, f"closed_reason must be one of {CLOSED_REASONS}")
+        if index is not None and (isinstance(index, bool) or not isinstance(index, int) or index < 0):
+            raise BoardError(HTTPStatus.BAD_REQUEST, "index must be a non-negative integer")
         folder = self.find(app_id)
         target = self.root / stage / app_id
+        # Reordering inside Closed keeps the reason; entering Closed (or changing the reason) needs a valid one.
+        if stage == CLOSED and (target != folder or closed_reason is not None) \
+                and closed_reason not in CLOSED_REASONS:
+            raise BoardError(HTTPStatus.BAD_REQUEST, f"closed_reason must be one of {CLOSED_REASONS}")
         if target != folder and target.exists():
             raise BoardError(HTTPStatus.CONFLICT, f"{stage}/{app_id} already exists")
 
-        # Rewrite the file first: if it fails, the Application is still in its old Stage, unchanged.
+        # Rewrite the files first: if that fails, the Application is still in its old Stage.
+        if index is not None:
+            self._place(app_id, stage, index)
         front, notes = _read(folder)
+        if index is None:
+            front.pop("position", None)
         if stage == CLOSED:
-            front["closed_reason"] = closed_reason
+            if closed_reason is not None:
+                front["closed_reason"] = closed_reason
         else:
             front.pop("closed_reason", None)
         if target != folder:
@@ -184,6 +199,57 @@ class Board:
             target.parent.mkdir(parents=True, exist_ok=True)
             folder.rename(target)
         return self.summary(target)
+
+    def sort_by_fit(self, stage: str) -> list[dict]:
+        """Forget every hand placement in `stage`'s column, so it is ordered by Fit again."""
+        if stage not in STAGES:
+            raise BoardError(HTTPStatus.BAD_REQUEST, f"unknown stage: {stage}")
+        for file in (self.root / stage).glob(f"*/{APPLICATION_FILE}"):
+            front, notes = _read(file.parent)
+            if front.pop("position", None) is not None:
+                _write(file.parent, front, notes)
+        return self.applications()
+
+    def _place(self, app_id: str, stage: str, index: int) -> None:
+        """Give the Application a `position` that puts it at `index` of `stage`'s column (docs/adr/0004).
+
+        Usually only its own file changes: it gets a value between its neighbours' sort keys. When the
+        neighbours share a key (same Fit, never placed) or the floats run out of room, the cards sharing
+        that stretch of the column are spread out evenly between the keys around them.
+        """
+        column = [a for a in self.applications() if a["stage"] == stage and a["id"] != app_id]
+        index = min(index, len(column))
+        keys = [_order_key(a) for a in column]
+        if not column:
+            return self._set_position(self.find(app_id), _fit_position(self.summary(self.find(app_id))))
+        lo = keys[index - 1] if index else None
+        hi = keys[index] if index < len(keys) else None
+        spot = (hi - 1 if lo is None else lo + 1 if hi is None else (lo + hi) / 2)
+        if (lo is None or lo < spot) and (hi is None or spot < hi):
+            return self._set_position(self.find(app_id), spot)
+
+        # No room: spread the stretch of cards whose keys lie in [lo, hi] between the keys around it.
+        lo, hi = (hi if lo is None else lo), (lo if hi is None else hi)
+        first = next(i for i, k in enumerate(keys) if k >= lo)
+        last = max(i for i, k in enumerate(keys) if k <= hi)
+        ids = [a["id"] for a in column[first:last + 1]]
+        ids.insert(index - first, app_id)
+        before = keys[first - 1] if first else lo - FIT_STEP
+        after = keys[last + 1] if last + 1 < len(keys) else hi + FIT_STEP
+        spots = _spread(before, after, len(ids))
+        if not spots:  # that stretch is out of room too: spread the whole column
+            ids = [a["id"] for a in column]
+            ids.insert(index, app_id)
+            spots = _spread(keys[0] - FIT_STEP, keys[-1] + FIT_STEP, len(ids))
+        for other, position in zip(ids, spots):
+            self._set_position(self.find(other), position)
+
+    def _set_position(self, folder: Path, position: float) -> None:
+        front, notes = _read(folder)
+        value = _format_position(position)
+        if front.get("position") != value:
+            front["position"] = value
+            _write(folder, front, notes)
 
     def detail(self, app_id: str) -> dict:
         folder = self.find(app_id)
@@ -222,6 +288,50 @@ class Board:
         if not path.is_file():
             raise BoardError(HTTPStatus.NOT_FOUND, "file not found")
         return path
+
+
+def _newest_first(apps: list[dict]) -> list[dict]:
+    return sorted(apps, key=lambda a: (a.get("created", ""), a["id"]), reverse=True)
+
+
+def _position(app: dict) -> float | None:
+    """Where the user put the Application in its column; None if never placed (or unreadable)."""
+    try:
+        value = float(app["position"])
+    except (KeyError, ValueError):
+        return None
+    return value if value == value and abs(value) != float("inf") else None
+
+
+FIT_STEP = 10.0  # gap between two Fits' spots, so hand-placed cards fit in between
+
+
+def _fit_position(app: dict) -> float:
+    """The spot an Application that was never placed takes: higher Fit first, no Fit last."""
+    fit = str(app.get("fit", "")).strip()
+    return FIT_STEP * (6 - int(fit)) if fit in ("1", "2", "3", "4", "5") else FIT_STEP * 6
+
+
+def _order_key(app: dict) -> float:
+    position = _position(app)
+    return _fit_position(app) if position is None else position
+
+
+def _spread(before: float, after: float, count: int) -> list[float]:
+    """`count` evenly spaced values strictly between `before` and `after`; [] if floats can't fit them."""
+    spots = [before + (after - before) * (i + 1) / (count + 1) for i in range(count)]
+    bounds = [before, *spots, after]
+    return spots if all(a < b for a, b in zip(bounds, bounds[1:])) else []
+
+
+def _format_position(position: float) -> str:
+    return str(int(position)) if position.is_integer() else repr(position)
+
+
+def _board_order(apps: list[dict]) -> list[dict]:
+    """Each column's order: by Fit (highest first, newest first within a Fit), with hand-placed cards
+    kept where the user put them (docs/adr/0004)."""
+    return sorted(_newest_first(apps), key=_order_key)  # stable: ties keep newest first
 
 
 def now() -> datetime:
@@ -311,13 +421,17 @@ def create_server(root: Path, port: int) -> ThreadingHTTPServer:
             raise BoardError(HTTPStatus.NOT_FOUND, "not found")
 
         def _post(self, path):
+            if match := SORT_ROUTE.match(path):
+                self._body()  # refuses cross-origin writes
+                return self._json({"applications": board.sort_by_fit(unquote(match.group(1)))})
             match = API_ROUTE.match(path)
             if not match or match.group(2) not in ("move", "open-folder"):
                 raise BoardError(HTTPStatus.NOT_FOUND, "not found")
             body = self._body()
             if match.group(2) == "open-folder":
                 return self._json(board.open_folder(unquote(match.group(1))))
-            self._json(board.move(unquote(match.group(1)), body.get("stage", ""), body.get("closed_reason")))
+            self._json(board.move(unquote(match.group(1)), body.get("stage", ""), body.get("closed_reason"),
+                                  body.get("index")))
 
         def _put(self, path):
             match = API_ROUTE.match(path)
